@@ -99,7 +99,7 @@ export function CreativeSlides({
             key={activeSlide?.url}
             title={`Biến thể quảng cáo ${activeIndex + 1}`}
             srcDoc={scriptPreviewHtml}
-            sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"
+            sandbox="allow-forms allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"
             referrerPolicy="no-referrer"
             className="h-[540px] w-full bg-white"
           />
@@ -131,13 +131,13 @@ function buildScriptPreviewHtml(scriptUrl: string) {
   const url = new URL(scriptUrl);
   const parentId = url.searchParams.get("htmlParentId") ?? "fletch-render-root";
   const callbackName = url.searchParams.get("responseCallback") ?? "fletchCallback";
+  const iframeSandbox = "allow-forms allow-scripts";
 
   return `<!doctype html>
 <html>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <base href="https://displayads-formats.googleusercontent.com/" />
     <style>
       html, body { margin: 0; min-height: 100%; overflow: hidden; background: #fff; }
       body { display: grid; place-items: center; padding: 24px; box-sizing: border-box; }
@@ -148,11 +148,12 @@ function buildScriptPreviewHtml(scriptUrl: string) {
   <body>
     <div id="${parentId}"></div>
     <script>
+      var iframeSandbox = ${JSON.stringify(iframeSandbox)};
       window.__originalCreateElement = document.createElement.bind(document);
       document.createElement = function(tagName) {
         var element = window.__originalCreateElement(tagName);
         if (String(tagName).toLowerCase() === 'iframe') {
-          element.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox');
+          element.setAttribute('sandbox', iframeSandbox);
           element.setAttribute('referrerpolicy', 'no-referrer');
         }
         return element;
@@ -164,14 +165,15 @@ function buildScriptPreviewHtml(scriptUrl: string) {
         if (typeof response === 'string') html = response;
         if (response && typeof response.html === 'string') html = response.html;
         if (!html) return;
+        html = html.replace(/<iframe\b([^>]*)>/gi, function(match, attrs) {
+          var nextAttrs = attrs.replace(/\s+sandbox=("[^"]*"|'[^']*'|[^\s>]*)/i, '');
+          nextAttrs = nextAttrs.replace(/\s+referrerpolicy=("[^"]*"|'[^']*'|[^\s>]*)/i, '');
+          return '<iframe' + nextAttrs + ' sandbox="' + iframeSandbox + '" referrerpolicy="no-referrer">';
+        });
         root.innerHTML = html;
         root.querySelectorAll('iframe').forEach(function(frame) {
-          frame.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox');
+          frame.setAttribute('sandbox', iframeSandbox);
           frame.setAttribute('referrerpolicy', 'no-referrer');
-          var src = frame.getAttribute('src');
-          if (src && src.charAt(0) === '/') {
-            frame.setAttribute('src', 'https://displayads-formats.googleusercontent.com' + src);
-          }
         });
       };
     </script>

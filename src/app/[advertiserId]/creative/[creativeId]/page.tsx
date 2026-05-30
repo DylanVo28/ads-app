@@ -76,7 +76,7 @@ function extractSlides(raw: unknown): CreativeSlide[] {
   const variants = (raw as CreativeByIdRaw | undefined)?.["1"]?.["5"] ?? [];
   const seenUrls = new Set<string>();
 
-  return variants.flatMap((variant) => {
+  return variants.flatMap<CreativeSlide>((variant) => {
     const imageHtml = variant["3"]?.["2"];
     const imageUrl = imageHtml?.match(/src="([^"]+)"/)?.[1];
     const scriptUrl = variant["1"]?.["4"];
