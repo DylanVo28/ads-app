@@ -46,13 +46,6 @@ function AdPreview({ imageUrl }: { imageUrl?: string }) {
 
   return (
     <div className="group overflow-hidden rounded-[2rem] border border-[#f6cf84]/20 bg-[#fffaf0] shadow-[0_24px_90px_rgba(0,0,0,0.38)] transition duration-500 hover:-translate-y-2 hover:border-[#ffd27a]/60 hover:shadow-[0_34px_120px_rgba(198,119,33,0.35)]">
-      <div className="border-b border-[#d8b36c]/25 bg-gradient-to-r from-[#1b1208] via-[#4b2b0d] to-[#161d31] px-4 py-3 text-[#ffe6aa]">
-        <div className="flex items-center justify-between gap-3 text-[11px] font-black uppercase tracking-[0.24em]">
-          <span>Royal Ad Relic</span>
-          <span className="rounded-full border border-[#ffd27a]/30 px-3 py-1 text-[10px] text-[#fff8e1]">Sponsored</span>
-        </div>
-        <div className="mt-2 truncate text-xs font-semibold text-[#d8e4ff]">{host}</div>
-      </div>
       <div className="relative p-3">
         <div className="pointer-events-none absolute inset-3 rounded-[1.5rem] bg-[radial-gradient(circle_at_50%_0%,rgba(255,210,122,0.22),transparent_42%)] opacity-0 transition duration-500 group-hover:opacity-100" />
         {proxiedImageUrl ? (
