@@ -1,5 +1,8 @@
 'use server'
 
+import { execFile } from 'node:child_process'
+import { promisify } from 'node:util'
+
 export type GoogleAdAdvertiserSuggestion = {
   type: 'advertiser'
   name: string
@@ -83,6 +86,7 @@ const GET_CREATIVE_BY_ID_URL =
 
 const GOOGLE_ADS_CACHE_TTL_MS = 10 * 60 * 1000
 const GOOGLE_ADS_RETRY_DELAYS_MS = [750, 1500, 3000]
+const execFileAsync = promisify(execFile)
 
 type CacheEntry<T> = {
   expiresAt: number
@@ -91,6 +95,7 @@ type CacheEntry<T> = {
 
 const creativeByIdCache = new Map<string, CacheEntry<GoogleAdCreativeByIdResult>>()
 const creativesCache = new Map<string, CacheEntry<GoogleAdCreativesResult>>()
+const suggestionsCache = new Map<string, CacheEntry<GoogleAdSearchSuggestionsResult>>()
 
 function getCachedGoogleAdsResult<T>(
   cache: Map<string, CacheEntry<T>>,
@@ -121,8 +126,49 @@ function sleep(milliseconds: number) {
   return new Promise((resolve) => setTimeout(resolve, milliseconds))
 }
 
-async function fetchGoogleAdsRpc(url: string, init: RequestInit): Promise<Response> {
+async function postGoogleAdsRpcWithCurl(
+  url: string,
+  headers: HeadersInit,
+  encodedFields: Record<string, string>,
+) {
+  const headerEntries = new Headers(headers).entries()
+  const args = [
+    '--silent',
+    '--show-error',
+    '--location',
+    '--write-out',
+    '\n%{http_code}',
+    url,
+  ]
+
+  for (const [name, value] of headerEntries) {
+    args.push('--header', `${name}: ${value}`)
+  }
+
+  for (const [name, value] of Object.entries(encodedFields)) {
+    args.push('--data-urlencode', `${name}=${value}`)
+  }
+
+  const { stdout } = await execFileAsync('curl', args, {
+    maxBuffer: 2 * 1024 * 1024,
+  })
+  const statusSeparatorIndex = stdout.lastIndexOf('\n')
+  const text = stdout.slice(0, statusSeparatorIndex)
+  const status = Number(stdout.slice(statusSeparatorIndex + 1))
+
+  return { ok: status >= 200 && status < 300, status, statusText: '', text }
+}
+
+async function fetchGoogleAdsRpc(
+  url: string,
+  init: RequestInit,
+  options?: { retry429?: boolean },
+): Promise<Response> {
   let response = await fetch(url, init)
+
+  if (options?.retry429 === false) {
+    return response
+  }
 
   for (const delay of GOOGLE_ADS_RETRY_DELAYS_MS) {
     if (response.status !== 429) {
@@ -151,45 +197,52 @@ export async function fetchGoogleAdSearchSuggestions(
     return { suggestions: [], raw: null }
   }
 
-  const requestPayload: Record<string, unknown> = {
+  const limit = options?.limit ?? 10
+  const cacheKey = JSON.stringify({
+    query: query.toLowerCase(),
+    limit,
+    regionIds: options?.regionIds ?? [],
+    language: options?.language ?? 'en-US',
+  })
+
+  return getCachedGoogleAdsResult(suggestionsCache, cacheKey, async () => {
+    const requestPayload: Record<string, unknown> = {
       '1': query,
-      '2': options?.limit ?? 10,
-      '3': options?.limit ?? 10,
+      '2': limit,
+      '3': limit,
       '5': { '1': 1 },
-  }
+    }
 
-  if (options?.regionIds?.length) {
-    requestPayload['4'] = options.regionIds
-  }
+    if (options?.regionIds?.length) {
+      requestPayload['4'] = options.regionIds
+    }
 
-  const body = new URLSearchParams({
-    'f.req': JSON.stringify(requestPayload),
-  })
-
-  const response = await fetchGoogleAdsRpc(SEARCH_SUGGESTIONS_URL, {
-    method: 'POST',
-    cache: 'no-store',
-    headers: buildGoogleAdsTransparencyHeaders({
+    const requestPayloadJson = JSON.stringify(requestPayload)
+    const headers = buildGoogleAdsTransparencyHeaders({
       language: options?.language,
-      referer: 'https://adstransparency.google.com/?authuser=0',
-    }),
-    body,
-  })
-
-  if (!response.ok) {
-    throw new Error(
-      `Google Ads Transparency suggestions failed: ${response.status} ${response.statusText}`,
+      referer: 'https://adstransparency.google.com/?authuser=0&region=anywhere',
+    })
+    const response = await postGoogleAdsRpcWithCurl(
+      SEARCH_SUGGESTIONS_URL,
+      headers,
+      { 'f.req': requestPayloadJson },
     )
-  }
 
-  const text = await response.text()
-  const data = JSON.parse(stripJsonPrefix(text)) as GoogleAdSuggestionsRpcResponse
+    if (!response.ok) {
+      throw new Error(
+        `Google Ads Transparency suggestions failed: ${response.status} ${response.statusText}`,
+      )
+    }
 
-  return {
-    suggestions: normalizeSuggestions(data),
-    nextPageToken: data['3'],
-    raw: data,
-  }
+    const text = response.text
+    const data = JSON.parse(stripJsonPrefix(text)) as GoogleAdSuggestionsRpcResponse
+
+    return {
+      suggestions: normalizeSuggestions(data),
+      nextPageToken: data['3'],
+      raw: data,
+    }
+  })
 }
 
 function normalizeSuggestions(
@@ -448,8 +501,16 @@ function buildGoogleAdsTransparencyHeaders(options?: {
     'accept-language': options?.language ?? 'en-US,en;q=0.7',
     'content-type': 'application/x-www-form-urlencoded',
     origin: 'https://adstransparency.google.com',
+    priority: 'u=1, i',
     referer:
       options?.referer ?? 'https://adstransparency.google.com/?authuser=0',
+    'sec-ch-ua': '"Brave";v="147", "Not.A/Brand";v="8", "Chromium";v="147"',
+    'sec-ch-ua-mobile': '?0',
+    'sec-ch-ua-platform': '"macOS"',
+    'sec-fetch-dest': 'empty',
+    'sec-fetch-mode': 'cors',
+    'sec-fetch-site': 'same-origin',
+    'sec-gpc': '1',
     'user-agent':
       'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36',
     'x-same-domain': '1',

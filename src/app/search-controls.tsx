@@ -83,7 +83,7 @@ export function SearchControls() {
   useEffect(() => {
     const trimmedQuery = query.trim();
 
-    if (!trimmedQuery) {
+    if (trimmedQuery.length < 2) {
       return;
     }
 

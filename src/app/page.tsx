@@ -109,7 +109,7 @@ export default function Home() {
   useEffect(() => {
     const trimmedQuery = query.trim();
 
-    if (!trimmedQuery) {
+    if (trimmedQuery.length < 2) {
       return;
     }
 
