@@ -151,14 +151,19 @@ export async function fetchGoogleAdSearchSuggestions(
     return { suggestions: [], raw: null }
   }
 
-  const body = new URLSearchParams({
-    'f.req': JSON.stringify({
+  const requestPayload: Record<string, unknown> = {
       '1': query,
       '2': options?.limit ?? 10,
       '3': options?.limit ?? 10,
-      '4': options?.regionIds ?? [2704],
       '5': { '1': 1 },
-    }),
+  }
+
+  if (options?.regionIds?.length) {
+    requestPayload['4'] = options.regionIds
+  }
+
+  const body = new URLSearchParams({
+    'f.req': JSON.stringify(requestPayload),
   })
 
   const response = await fetchGoogleAdsRpc(SEARCH_SUGGESTIONS_URL, {
@@ -166,7 +171,7 @@ export async function fetchGoogleAdSearchSuggestions(
     cache: 'no-store',
     headers: buildGoogleAdsTransparencyHeaders({
       language: options?.language,
-      referer: 'https://adstransparency.google.com/?authuser=0&region=VN',
+      referer: 'https://adstransparency.google.com/?authuser=0',
     }),
     body,
   })
@@ -319,8 +324,8 @@ async function fetchGoogleAdCreativesUncached(
     headers: buildGoogleAdsTransparencyHeaders({
       language: options?.language,
       referer: isDomainRequest
-        ? `https://adstransparency.google.com/?authuser=0&region=VN&domain=${encodeURIComponent(id)}`
-        : `https://adstransparency.google.com/advertiser/${id}?authuser=0&region=VN`,
+        ? `https://adstransparency.google.com/?authuser=0&domain=${encodeURIComponent(id)}`
+        : `https://adstransparency.google.com/advertiser/${id}?authuser=0`,
     }),
     body,
   })
@@ -409,7 +414,7 @@ async function fetchGoogleAdCreativeByIdUncached(
     cache: 'no-store',
     headers: buildGoogleAdsTransparencyHeaders({
       language: options?.language,
-      referer: `https://adstransparency.google.com/advertiser/${normalizedAdvertiserId}/creative/${normalizedCreativeId}?authuser=0&region=VN`,
+      referer: `https://adstransparency.google.com/advertiser/${normalizedAdvertiserId}/creative/${normalizedCreativeId}?authuser=0`,
     }),
     body,
   })
@@ -444,7 +449,7 @@ function buildGoogleAdsTransparencyHeaders(options?: {
     'content-type': 'application/x-www-form-urlencoded',
     origin: 'https://adstransparency.google.com',
     referer:
-      options?.referer ?? 'https://adstransparency.google.com/?authuser=0&region=VN',
+      options?.referer ?? 'https://adstransparency.google.com/?authuser=0',
     'user-agent':
       'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36',
     'x-same-domain': '1',
