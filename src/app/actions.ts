@@ -54,6 +54,13 @@ export type GoogleAdCreativeByIdResult = {
   raw: unknown
 }
 
+type GoogleAdsCurlResponse = {
+  ok: boolean
+  status: number
+  statusText: string
+  text: string
+}
+
 type GoogleAdSuggestionsRpcResponse = {
   '1'?: Array<{
     '1'?: {
@@ -130,7 +137,7 @@ async function postGoogleAdsRpcWithCurl(
   url: string,
   headers: HeadersInit,
   encodedFields: Record<string, string>,
-) {
+): Promise<GoogleAdsCurlResponse> {
   const headerEntries = new Headers(headers).entries()
   const args = [
     '--silent',
@@ -278,6 +285,14 @@ function stripJsonPrefix(text: string) {
   return text.replace(/^\)\]\}'\n?/, '')
 }
 
+function getGoogleAdsRpcErrorHint(text: string) {
+  if (text.includes('/sorry/index') || text.includes('Our systems have detected unusual traffic')) {
+    return ' Google returned a CAPTCHA/sorry page; refresh GOOGLE_ADS_TRANSPARENCY_COOKIE and GOOGLE_ADS_TRANSPARENCY_XSRF_TOKEN from the browser session, including GOOGLE_ABUSE_EXEMPTION if present.'
+  }
+
+  return ''
+}
+
 
 type GoogleAdCreativesRpcResponse = {
   '1'?: Array<{
@@ -352,44 +367,40 @@ async function fetchGoogleAdCreativesUncached(
     language?: 'en-US' | string
   },
 ): Promise<GoogleAdCreativesResult> {
-
   const regionId = options?.regionId ?? 2704
   const isDomainRequest = isDomain(id)
-  const body = new URLSearchParams({
-    'f.req': JSON.stringify({
-      '2': options?.limit ?? 40,
-      '3': {
-        '8': options?.topicIds ?? [regionId],
-        '12': { '1': options?.nextPageToken ?? (isDomainRequest ? id : ''), '2': true },
-        ...(isDomainRequest ? {} : { '13': { '1': [id] } }),
-      },
-      '7': {
-        '1': 1,
-        '2': options?.pageSize ?? 25,
-        '3': regionId,
-      },
-    }),
+  const requestPayloadJson = JSON.stringify({
+    '2': options?.limit ?? 40,
+    '3': {
+      ...(isDomainRequest ? {} : { '8': options?.topicIds ?? [regionId] }),
+      '12': { '1': options?.nextPageToken ?? (isDomainRequest ? id : ''), '2': true },
+      ...(isDomainRequest ? {} : { '13': { '1': [id] } }),
+    },
+    '7': {
+      '1': 1,
+      '2': options?.pageSize ?? 25,
+      '3': regionId,
+    },
   })
 
-  const response = await fetchGoogleAdsRpc(SEARCH_CREATIVES_URL, {
-    method: 'POST',
-    cache: 'no-store',
-    headers: buildGoogleAdsTransparencyHeaders({
+  const response = await postGoogleAdsRpcWithCurl(
+    SEARCH_CREATIVES_URL,
+    buildGoogleAdsTransparencyHeaders({
       language: options?.language,
       referer: isDomainRequest
-        ? `https://adstransparency.google.com/?authuser=0&domain=${encodeURIComponent(id)}`
+        ? `https://adstransparency.google.com/?authuser=0&region=anywhere&domain=${encodeURIComponent(id)}`
         : `https://adstransparency.google.com/advertiser/${id}?authuser=0`,
     }),
-    body,
-  })
+    { 'f.req': requestPayloadJson },
+  )
 
   if (!response.ok) {
     throw new Error(
-      `Google Ads Transparency creatives failed: ${response.status} ${response.statusText}`,
+      `Google Ads Transparency creatives failed: ${response.status} ${response.statusText}.${getGoogleAdsRpcErrorHint(response.text)}`,
     )
   }
 
-  const text = await response.text()
+  const text = response.text
   const data = JSON.parse(stripJsonPrefix(text)) as GoogleAdCreativesRpcResponse
 
   if (!data['1']) {
