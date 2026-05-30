@@ -169,7 +169,7 @@ export function SearchControls() {
         )}
       </div>
 
-      <div className="relative lg:w-[390px]">
+      {/* <div className="relative lg:w-[390px]">
         <button type="button" onClick={() => setIsDropdownOpen((open) => !open)} className="flex h-[70px] w-full items-center justify-between rounded-[28px] border border-[#f6cf84]/35 bg-[#f6cf84]/10 px-5 text-base font-black text-white md:h-[78px] md:px-7 md:text-lg lg:rounded-full" aria-expanded={isDropdownOpen} aria-haspopup="listbox">
           <span className="flex min-w-0 items-center gap-4"><CheckIcon /><span className="truncate">{selectedLocation}</span></span>
           <ChevronDown open={isDropdownOpen} />
@@ -184,7 +184,7 @@ export function SearchControls() {
             ))}
           </div>
         )}
-      </div>
+      </div> */}
     </div>
   );
 }
