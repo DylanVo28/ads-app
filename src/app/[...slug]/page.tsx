@@ -118,10 +118,15 @@ function VerifiedAdvertiserCard({
 export default async function Page({ params }: PageProps) {
   const { slug } = await params;
   const advertiserId = slug[0] || DEFAULT_ADVERTISER_ID;
-  const result = await fetchGoogleAdCreatives(advertiserId, { pageSize: 40 });
+  const result = await fetchGoogleAdCreatives(advertiserId, { pageSize: 40 }).catch((error) => {
+    console.error(error);
+
+    return { creatives: [], raw: null };
+  });
   const decodedTarget = decodeURIComponent(advertiserId);
   const primaryAdvertiser = result.creatives[0]?.advertiserName || decodedTarget;
   const advertiserDomain = result.creatives[0]?.domain;
+  const hasCreatives = result.creatives.length > 0;
 
   function getCreativeHref(creative: (typeof result.creatives)[number]) {
     const targetAdvertiserId = creative.advertiserId || advertiserId;
@@ -166,8 +171,9 @@ export default async function Page({ params }: PageProps) {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-7 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {result.creatives.map((creative, index) => (
+          {hasCreatives ? (
+            <div className="grid grid-cols-1 gap-7 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {result.creatives.map((creative, index) => (
               <Link
                 key={creative.creativeId || index}
                 href={getCreativeHref(creative)}
@@ -187,8 +193,16 @@ export default async function Page({ params }: PageProps) {
                   </div>
                 </div>
               </Link>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-[2rem] border border-[#ffd27a]/25 bg-[#071226]/86 px-6 py-10 text-center text-[#d7dfef] shadow-[0_24px_90px_rgba(0,0,0,0.34)] backdrop-blur">
+              <h3 className="text-2xl font-black text-white">Google đang giới hạn lượt tải dữ liệu</h3>
+              <p className="mx-auto mt-4 max-w-2xl text-lg leading-8">
+                Không thể tải danh sách quảng cáo lúc này do Google Ads Transparency trả về 429. Vui lòng chờ một lát rồi tải lại trang.
+              </p>
+            </div>
+          )}
         </section>
       </div>
     </main>

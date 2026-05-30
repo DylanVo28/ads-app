@@ -81,6 +81,62 @@ const SEARCH_CREATIVES_URL =
 const GET_CREATIVE_BY_ID_URL =
   'https://adstransparency.google.com/anji/_/rpc/LookupService/GetCreativeById?authuser=0'
 
+const GOOGLE_ADS_CACHE_TTL_MS = 10 * 60 * 1000
+const GOOGLE_ADS_RETRY_DELAYS_MS = [750, 1500, 3000]
+
+type CacheEntry<T> = {
+  expiresAt: number
+  promise: Promise<T>
+}
+
+const creativeByIdCache = new Map<string, CacheEntry<GoogleAdCreativeByIdResult>>()
+const creativesCache = new Map<string, CacheEntry<GoogleAdCreativesResult>>()
+
+function getCachedGoogleAdsResult<T>(
+  cache: Map<string, CacheEntry<T>>,
+  key: string,
+  loader: () => Promise<T>,
+) {
+  const now = Date.now()
+  const cached = cache.get(key)
+
+  if (cached && cached.expiresAt > now) {
+    return cached.promise
+  }
+
+  const promise = loader().catch((error) => {
+    cache.delete(key)
+    throw error
+  })
+
+  cache.set(key, {
+    expiresAt: now + GOOGLE_ADS_CACHE_TTL_MS,
+    promise,
+  })
+
+  return promise
+}
+
+function sleep(milliseconds: number) {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds))
+}
+
+async function fetchGoogleAdsRpc(url: string, init: RequestInit): Promise<Response> {
+  let response = await fetch(url, init)
+
+  for (const delay of GOOGLE_ADS_RETRY_DELAYS_MS) {
+    if (response.status !== 429) {
+      break
+    }
+
+    const retryAfter = Number(response.headers.get('retry-after'))
+    await sleep(retryAfter > 0 ? retryAfter * 1000 : delay)
+    response = await fetch(url, init)
+  }
+
+  return response
+}
+
 export async function fetchGoogleAdSearchSuggestions(
   keyword: string,
   options?: {
@@ -105,7 +161,7 @@ export async function fetchGoogleAdSearchSuggestions(
     }),
   })
 
-  const response = await fetch(SEARCH_SUGGESTIONS_URL, {
+  const response = await fetchGoogleAdsRpc(SEARCH_SUGGESTIONS_URL, {
     method: 'POST',
     cache: 'no-store',
     headers: buildGoogleAdsTransparencyHeaders({
@@ -212,6 +268,33 @@ export async function fetchGoogleAdCreatives(
     return { creatives: [], raw: null }
   }
 
+  const cacheKey = JSON.stringify({
+    id,
+    limit: options?.limit ?? 40,
+    pageSize: options?.pageSize ?? 25,
+    regionId: options?.regionId ?? 2704,
+    topicIds: options?.topicIds ?? [options?.regionId ?? 2704],
+    nextPageToken: options?.nextPageToken ?? '',
+    language: options?.language ?? 'en-US',
+  })
+
+  return getCachedGoogleAdsResult(creativesCache, cacheKey, () =>
+    fetchGoogleAdCreativesUncached(id, options),
+  )
+}
+
+async function fetchGoogleAdCreativesUncached(
+  id: string,
+  options?: {
+    limit?: number
+    pageSize?: number
+    regionId?: number
+    topicIds?: number[]
+    nextPageToken?: string
+    language?: 'en-US' | string
+  },
+): Promise<GoogleAdCreativesResult> {
+
   const regionId = options?.regionId ?? 2704
   const isDomainRequest = isDomain(id)
   const body = new URLSearchParams({
@@ -230,7 +313,7 @@ export async function fetchGoogleAdCreatives(
     }),
   })
 
-  const response = await fetch(SEARCH_CREATIVES_URL, {
+  const response = await fetchGoogleAdsRpc(SEARCH_CREATIVES_URL, {
     method: 'POST',
     cache: 'no-store',
     headers: buildGoogleAdsTransparencyHeaders({
@@ -282,6 +365,32 @@ export async function fetchGoogleAdCreativeById(
     return { raw: null }
   }
 
+  const cacheKey = JSON.stringify({
+    advertiserId: normalizedAdvertiserId,
+    creativeId: normalizedCreativeId,
+    pageSize: options?.pageSize ?? 25,
+    regionId: options?.regionId ?? 2704,
+    language: options?.language ?? 'en-US',
+  })
+
+  return getCachedGoogleAdsResult(creativeByIdCache, cacheKey, () =>
+    fetchGoogleAdCreativeByIdUncached(
+      normalizedAdvertiserId,
+      normalizedCreativeId,
+      options,
+    ),
+  )
+}
+
+async function fetchGoogleAdCreativeByIdUncached(
+  normalizedAdvertiserId: string,
+  normalizedCreativeId: string,
+  options?: {
+    pageSize?: number
+    regionId?: number
+    language?: 'en-US' | string
+  },
+): Promise<GoogleAdCreativeByIdResult> {
   const regionId = options?.regionId ?? 2704
   const body = new URLSearchParams({
     'f.req': JSON.stringify({
@@ -295,7 +404,7 @@ export async function fetchGoogleAdCreativeById(
     }),
   })
 
-  const response = await fetch(GET_CREATIVE_BY_ID_URL, {
+  const response = await fetchGoogleAdsRpc(GET_CREATIVE_BY_ID_URL, {
     method: 'POST',
     cache: 'no-store',
     headers: buildGoogleAdsTransparencyHeaders({
