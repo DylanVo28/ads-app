@@ -127,6 +127,68 @@ function VerifiedAdvertiserCard({
   );
 }
 
+function TransparencyNotices() {
+  const notices = [
+    {
+      message:
+        "Một số nhà quảng cáo hiển thị quảng cáo có nội dung bị giới hạn độ tuổi. Hãy đăng nhập để xác định xem chúng tôi có thể hiển thị những quảng cáo này cho bạn không.",
+      actions: ["Đóng", "Đăng nhập"],
+    },
+    {
+      message:
+        "Các kết quả này chỉ bao gồm những quảng cáo xuất hiện ở Châu Âu và Thổ Nhĩ Kỳ.",
+      link: "Tìm hiểu thêm",
+      actions: ["Đóng"],
+    },
+  ];
+
+  return (
+    <div className="mx-auto mt-8 grid max-w-[1500px] gap-4">
+      {notices.map((notice) => (
+        <div
+          key={notice.message}
+          className="group relative overflow-hidden rounded-[1.7rem] border border-[#ffd27a]/20 bg-[#101f3a]/78 px-5 py-5 text-[#e7edf8] shadow-[0_22px_80px_rgba(0,0,0,0.34)] backdrop-blur-xl md:px-7"
+        >
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_5%_50%,rgba(255,210,122,0.18),transparent_24%),linear-gradient(90deg,rgba(74,135,255,0.16),rgba(255,210,122,0.06))] opacity-90" />
+          <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-[#ffd27a]/70 to-transparent" />
+
+          <div className="relative flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
+            <div className="flex min-w-0 gap-4">
+              <span className="mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[#7fb1ff]/45 bg-[#7fb1ff]/12 text-[#8dbaff] shadow-[0_0_38px_rgba(91,150,255,0.18)]">
+                <svg className="h-7 w-7" viewBox="0 0 28 28" fill="none" aria-hidden="true">
+                  <circle cx="14" cy="14" r="10.5" stroke="currentColor" strokeWidth="2.2" />
+                  <path d="M14 12.6v6.5" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
+                  <circle cx="14" cy="8.8" r="1.35" fill="currentColor" />
+                </svg>
+              </span>
+              <p className="text-base font-extrabold leading-7 text-[#eef4ff] md:text-xl md:leading-8">
+                {notice.message}{" "}
+                {notice.link && (
+                  <button className="font-black text-[#8dbaff] transition hover:text-[#ffd27a]" type="button">
+                    {notice.link}
+                  </button>
+                )}
+              </p>
+            </div>
+
+            <div className="flex shrink-0 items-center gap-3 self-end md:self-auto">
+              {notice.actions.map((action) => (
+                <button
+                  key={action}
+                  className="rounded-full border border-[#8dbaff]/20 bg-white/6 px-5 py-2.5 text-sm font-black text-[#8dbaff] transition hover:border-[#ffd27a]/50 hover:bg-[#ffd27a]/10 hover:text-[#ffd27a] md:text-base"
+                  type="button"
+                >
+                  {action}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default async function Page({ params }: PageProps) {
   const { slug } = await params;
   const advertiserId = slug[0] || DEFAULT_ADVERTISER_ID;
@@ -173,6 +235,8 @@ export default async function Page({ params }: PageProps) {
           legalName={primaryAdvertiser}
           headquarters="Việt Nam"
         />
+
+        <TransparencyNotices />
 
         <section className="mx-auto mt-10 max-w-[1500px]">
           <div className="mb-6 flex flex-col justify-between gap-4 md:flex-row md:items-end">
