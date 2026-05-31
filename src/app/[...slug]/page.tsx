@@ -38,6 +38,25 @@ function hostnameFromUrl(value?: string) {
   }
 }
 
+function dedupeCreativesByAdvertiserName<T extends { advertiserName?: string; creativeId: string }>(creatives: T[]) {
+  const seenAdvertiserNames = new Set<string>();
+
+  return creatives.filter((creative) => {
+    const advertiserNameKey = creative.advertiserName?.trim().toLowerCase();
+
+    if (!advertiserNameKey) {
+      return true;
+    }
+
+    if (seenAdvertiserNames.has(advertiserNameKey)) {
+      return false;
+    }
+
+    seenAdvertiserNames.add(advertiserNameKey);
+    return true;
+  });
+}
+
 function AdPreview({ imageUrl }: { imageUrl?: string }) {
   const host = hostnameFromUrl(imageUrl);
   const proxiedImageUrl = imageUrl
@@ -119,7 +138,8 @@ export default async function Page({ params }: PageProps) {
   const decodedTarget = decodeURIComponent(advertiserId);
   const primaryAdvertiser = result.creatives[0]?.advertiserName || decodedTarget;
   const advertiserDomain = result.creatives[0]?.domain;
-  const hasCreatives = result.creatives.length > 0;
+  const creatives = dedupeCreativesByAdvertiserName(result.creatives);
+  const hasCreatives = creatives.length > 0;
 
   function getCreativeHref(creative: (typeof result.creatives)[number]) {
     const targetAdvertiserId = creative.advertiserId || advertiserId;
@@ -166,7 +186,7 @@ export default async function Page({ params }: PageProps) {
 
           {hasCreatives ? (
             <div className="grid grid-cols-1 gap-7 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {result.creatives.map((creative, index) => (
+              {creatives.map((creative, index) => (
               <Link
                 key={creative.creativeId || index}
                 href={getCreativeHref(creative)}
