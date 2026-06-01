@@ -36,6 +36,10 @@ export type GoogleAdCreative = {
   format?: number
   imageHtml?: string
   imageUrl?: string
+  scriptUrl?: string
+  imageWidth?: number
+  imageHeight?: number
+  hasRichMedia?: boolean
   firstShownAt?: string
   lastShownAt?: string
   regionStats?: number
@@ -299,9 +303,13 @@ type GoogleAdCreativesRpcResponse = {
     '1'?: string
     '2'?: string
     '3'?: {
+      '1'?: {
+        '4'?: string
+      }
       '3'?: {
         '2'?: string
       }
+      '5'?: boolean
     }
     '4'?: number
     '6'?: GoogleTimestamp
@@ -545,6 +553,7 @@ function normalizeCreative(
   creative: NonNullable<GoogleAdCreativesRpcResponse['1']>[number],
 ): GoogleAdCreative {
   const imageHtml = creative['3']?.['3']?.['2']
+  const imageSize = extractImageSize(imageHtml)
 
   return {
     advertiserId: creative['1'] ?? '',
@@ -554,6 +563,10 @@ function normalizeCreative(
     format: creative['4'],
     imageHtml,
     imageUrl: extractImageUrl(imageHtml),
+    scriptUrl: creative['3']?.['1']?.['4'],
+    imageWidth: imageSize.width,
+    imageHeight: imageSize.height,
+    hasRichMedia: creative['3']?.['5'],
     firstShownAt: toIsoString(creative['6']),
     lastShownAt: toIsoString(creative['7']),
     regionStats: creative['13'],
@@ -578,6 +591,19 @@ function unwrapCreativeByIdResponse(data: GoogleAdCreativeByIdRpcResponse) {
 
 function extractImageUrl(html?: string) {
   return html?.match(/src="([^"]+)"/)?.[1]
+}
+
+function extractImageSize(html?: string) {
+  return {
+    width: parseHtmlNumberAttribute(html, 'width'),
+    height: parseHtmlNumberAttribute(html, 'height'),
+  }
+}
+
+function parseHtmlNumberAttribute(html: string | undefined, attributeName: string) {
+  const value = html?.match(new RegExp(`${attributeName}="(\\d+(?:\\.\\d+)?)"`))?.[1]
+
+  return value ? Number(value) : undefined
 }
 
 function toIsoString(timestamp?: GoogleTimestamp) {
