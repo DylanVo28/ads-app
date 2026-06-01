@@ -96,14 +96,28 @@ function extractImagePreviewFromRaw(raw: unknown) {
 }
 
 async function extractImagePreviewFromScript(scriptUrl: string) {
-  const response = await fetch(scriptUrl, { cache: "no-store" });
+  const response = await fetch(scriptUrl, {
+    cache: "no-store",
+    headers: {
+      accept: "application/javascript,text/javascript,*/*;q=0.8",
+      referer: "https://adstransparency.google.com/",
+      "user-agent":
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36",
+    },
+  });
 
   if (!response.ok) {
     return undefined;
   }
 
   const script = await response.text();
-  const imageUrl = script.match(/https:\/\/tpc\.googlesyndication\.com\/archive\/simgad\/\d+/)?.[0];
+  const insertedImage = extractInsertedPreviewImage(script);
+
+  if (insertedImage) {
+    return insertedImage;
+  }
+
+  const imageUrl = extractFirstScriptImageUrl(script);
 
   if (!imageUrl) {
     return undefined;
@@ -120,6 +134,57 @@ function parseHtmlNumberAttribute(html: string | undefined, attributeName: strin
   const value = html?.match(new RegExp(`${attributeName}="(\\d+(?:\\.\\d+)?)"`))?.[1];
 
   return value ? Number(value) : undefined;
+}
+
+function extractInsertedPreviewImage(script: string) {
+  const match = script.match(
+    /previewservice\.(?:registerDeferredInsertPreviewImageContent|insertPreviewImageContent)\(([^)]*)\)/,
+  );
+
+  if (!match) {
+    return undefined;
+  }
+
+  const args = parseScriptCallArguments(match[1]);
+  const imageUrl = args.find(isSupportedScriptImageUrl);
+
+  if (!imageUrl) {
+    return undefined;
+  }
+
+  const imageUrlIndex = args.indexOf(imageUrl);
+
+  return {
+    imageUrl,
+    imageWidth: parseNumber(args[imageUrlIndex + 1]),
+    imageHeight: parseNumber(args[imageUrlIndex + 2]),
+  };
+}
+
+function extractFirstScriptImageUrl(script: string) {
+  return script.match(/https:\/\/(?:tpc\.googlesyndication\.com\/archive\/simgad\/\d+|i\.ytimg\.com\/vi\/[^'"\s)]+\/[^'"\s)]+)/)?.[0];
+}
+
+function isSupportedScriptImageUrl(value: string) {
+  return /^https:\/\/(?:tpc\.googlesyndication\.com\/archive\/simgad\/\d+|i\.ytimg\.com\/vi\/[^/]+\/[^/]+)$/.test(value);
+}
+
+function parseScriptCallArguments(argumentsText: string) {
+  const args: string[] = [];
+  const argumentPattern = /'((?:\\'|[^'])*)'|"((?:\\"|[^"])*)"|(-?\d+(?:\.\d+)?)/g;
+  let match: RegExpExecArray | null;
+
+  while ((match = argumentPattern.exec(argumentsText))) {
+    args.push((match[1] ?? match[2] ?? match[3]).replace(/\\(['"])/g, "$1"));
+  }
+
+  return args;
+}
+
+function parseNumber(value: string | undefined) {
+  const number = Number(value);
+
+  return Number.isFinite(number) ? number : undefined;
 }
 
 function extractScriptNumberAttribute(script: string, attributeName: string) {

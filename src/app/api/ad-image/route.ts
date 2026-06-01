@@ -3,6 +3,7 @@ import { NextRequest } from "next/server";
 const ALLOWED_IMAGE_HOSTS = new Set([
   "tpc.googlesyndication.com",
   "googleads.g.doubleclick.net",
+  "i.ytimg.com",
 ]);
 
 export async function GET(request: NextRequest) {
