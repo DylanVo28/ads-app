@@ -276,7 +276,7 @@ function CreativeCard({ creative }: { creative: GoogleAdCreative }) {
 
 async function RelatedCreativeGallery({ advertiserId }: { advertiserId: string }) {
   const creatives = await fetchCreativeGallery(advertiserId);
-
+  
   if (!creatives.length) {
     return (
       <div className="bg-white px-7 py-10 text-center text-lg font-bold text-[#5f6368] lg:px-12">

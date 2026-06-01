@@ -38,6 +38,21 @@ function hostnameFromUrl(value?: string) {
   }
 }
 
+
+function getTime(value?: string) {
+  if (!value) {
+    return 0;
+  }
+
+  const time = new Date(value).getTime();
+
+  return Number.isNaN(time) ? 0 : time;
+}
+
+function sortCreativesByLastShownDesc<T extends { lastShownAt?: string }>(creatives: T[]) {
+  return [...creatives].sort((a, b) => getTime(b.lastShownAt) - getTime(a.lastShownAt));
+}
+
 function dedupeCreativesByAdvertiserName<T extends { advertiserName?: string; creativeId: string }>(creatives: T[]) {
   const seenAdvertiserNames = new Set<string>();
 
@@ -200,7 +215,7 @@ export default async function Page({ params }: PageProps) {
   const decodedTarget = decodeURIComponent(advertiserId);
   const primaryAdvertiser = result.creatives[0]?.advertiserName || decodedTarget;
   const advertiserDomain = result.creatives[0]?.domain;
-  const creatives = dedupeCreativesByAdvertiserName(result.creatives);
+  const creatives = dedupeCreativesByAdvertiserName(sortCreativesByLastShownDesc(result.creatives));
   const hasCreatives = creatives.length > 0;
 
   function getCreativeHref(creative: (typeof result.creatives)[number]) {
@@ -227,7 +242,7 @@ export default async function Page({ params }: PageProps) {
       <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_15%_8%,rgba(255,190,91,0.28),transparent_28%),radial-gradient(circle_at_82%_18%,rgba(46,108,255,0.22),transparent_30%),linear-gradient(145deg,#050914_0%,#111b33_45%,#3a1d08_100%)]" />
       <div className="pointer-events-none fixed inset-0 opacity-25 [background-image:linear-gradient(rgba(255,255,255,0.08)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.08)_1px,transparent_1px)] [background-size:80px_80px]" />
 
-      <div className="relative px-4 pb-20 pt-1 sm:px-8 lg:px-10">
+      <div className="relative px-4 pb-20 pt-24 sm:px-8 lg:px-10">
         <SearchControls />
 
         <VerifiedAdvertiserCard
@@ -236,7 +251,7 @@ export default async function Page({ params }: PageProps) {
           headquarters="Việt Nam"
         />
 
-        <TransparencyNotices />
+        {/* <TransparencyNotices /> */}
 
         <section className="mx-auto mt-10 max-w-[1500px]">
           <div className="mb-6 flex flex-col justify-between gap-4 md:flex-row md:items-end">

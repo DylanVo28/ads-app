@@ -483,14 +483,15 @@ async function fetchGoogleAdCreativeByIdUncached(
 
   const response = await fetchGoogleAdsRpc(GET_CREATIVE_BY_ID_URL, {
     method: 'POST',
-    cache: 'no-store',
     headers: buildGoogleAdsTransparencyHeaders({
       language: options?.language,
       referer: `https://adstransparency.google.com/advertiser/${normalizedAdvertiserId}/creative/${normalizedCreativeId}?authuser=0`,
     }),
     body,
   })
-
+  console.log({
+    response
+  })
   if (!response.ok) {
     throw new Error(
       `Google Ads Transparency creative lookup failed: ${response.status} ${response.statusText}`,

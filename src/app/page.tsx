@@ -147,16 +147,7 @@ export default function Home() {
       <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_14%_12%,rgba(252,188,78,0.26),transparent_28%),radial-gradient(circle_at_82%_6%,rgba(48,116,255,0.22),transparent_28%),linear-gradient(135deg,#050914_0%,#10192d_45%,#321b0b_100%)]" />
       <div className="pointer-events-none fixed inset-0 opacity-30 [background-image:linear-gradient(rgba(255,255,255,0.08)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.08)_1px,transparent_1px)] [background-size:72px_72px]" />
 
-      <div className="relative mx-auto w-full max-w-[1600px] px-4 pb-16 sm:px-8 lg:px-10">
-        <header className="flex items-center justify-between pt-6 md:pt-8">
-          <div className="rounded-full border border-[#f6cf84]/30 bg-white/8 px-5 py-3 text-sm font-black uppercase tracking-[0.32em] text-[#f9d588] backdrop-blur md:text-base">
-            Ads Citadel
-          </div>
-          <a href="#faq" className="rounded-full border border-white/15 bg-white/10 px-5 py-3 text-sm font-bold text-white shadow-2xl backdrop-blur transition hover:bg-white/18 md:text-lg">
-            Câu hỏi thường gặp
-          </a>
-        </header>
-
+      <div className="relative mx-auto w-full max-w-[1600px] px-4 pb-16 pt-24 sm:px-8 lg:px-10">
         <section className="pt-10 text-center md:pt-20">
           <p className="mx-auto w-fit rounded-full border border-[#f5c76b]/35 bg-[#f5c76b]/10 px-5 py-2 text-xs font-black uppercase tracking-[0.38em] text-[#ffd98b] md:text-sm">
             Đại sảnh minh bạch quảng cáo
