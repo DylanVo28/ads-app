@@ -7,6 +7,12 @@ type GoogleAdPreviewResponse = string | {
   body?: string;
   ad?: string;
   creative?: string;
+  previewMetadata?: Array<{
+    elementId?: string;
+    iframeId?: string;
+    width?: number;
+    height?: number;
+  }>;
 };
 
 function getCallbackName(scriptUrl: string) {
@@ -54,16 +60,43 @@ export function ScriptCreativePreview({ scriptUrl }: { scriptUrl: string }) {
     const fallbackParentId = `google-ad-preview-${generatedId}`;
     const parentId = getParentId(scriptUrl, fallbackParentId);
     const callbackName = getCallbackName(scriptUrl) ?? `fletchCallback${generatedId}`;
-    const previousCallback = (window as unknown as Record<string, unknown>)[callbackName];
+    const windowWithAdGlobals = window as unknown as Record<string, unknown>;
+    const previousAdData = windowWithAdGlobals.adData;
+    const previousExitConfig = windowWithAdGlobals.exitConfig;
+    const previousCallback = windowWithAdGlobals[callbackName];
     const script = document.createElement("script");
 
+    windowWithAdGlobals.adData ??= {};
+    windowWithAdGlobals.exitConfig ??= {};
     root.innerHTML = `<div id="${parentId}" class="flex h-full w-full items-center justify-center"></div>`;
 
-    (window as unknown as Record<string, unknown>)[callbackName] = (response: GoogleAdPreviewResponse) => {
+    windowWithAdGlobals[callbackName] = (response: GoogleAdPreviewResponse) => {
       const target = document.getElementById(parentId);
       const html = getPreviewHtml(response);
 
-      if (!target || !html) {
+      if (!target) {
+        setFailed(true);
+        return;
+      }
+
+      if (!html) {
+        const metadata = typeof response === "object" ? response.previewMetadata : undefined;
+        const renderedElementId = metadata?.find((item) => item.elementId)?.elementId;
+        const renderedElement = renderedElementId ? document.getElementById(renderedElementId) : undefined;
+
+        if (renderedElement) {
+          renderedElement.querySelectorAll("img").forEach((image) => {
+            image.classList.add("max-h-[230px]", "max-w-full", "object-contain");
+          });
+          setFailed(false);
+          return;
+        }
+
+        if (target.childElementCount > 0 || target.querySelector("img,iframe")) {
+          setFailed(false);
+          return;
+        }
+
         setFailed(true);
         return;
       }
@@ -91,9 +124,21 @@ export function ScriptCreativePreview({ scriptUrl }: { scriptUrl: string }) {
       script.remove();
 
       if (previousCallback) {
-        (window as unknown as Record<string, unknown>)[callbackName] = previousCallback;
+        windowWithAdGlobals[callbackName] = previousCallback;
       } else {
-        delete (window as unknown as Record<string, unknown>)[callbackName];
+        delete windowWithAdGlobals[callbackName];
+      }
+
+      if (previousAdData) {
+        windowWithAdGlobals.adData = previousAdData;
+      } else {
+        delete windowWithAdGlobals.adData;
+      }
+
+      if (previousExitConfig) {
+        windowWithAdGlobals.exitConfig = previousExitConfig;
+      } else {
+        delete windowWithAdGlobals.exitConfig;
       }
     };
   }, [generatedId, scriptUrl]);

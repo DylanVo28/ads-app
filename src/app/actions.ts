@@ -489,9 +489,7 @@ async function fetchGoogleAdCreativeByIdUncached(
     }),
     body,
   })
-  console.log({
-    response
-  })
+ 
   if (!response.ok) {
     throw new Error(
       `Google Ads Transparency creative lookup failed: ${response.status} ${response.statusText}`,
