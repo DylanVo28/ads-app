@@ -244,31 +244,43 @@ function CreativeCard({ creative }: { creative: GoogleAdCreative }) {
   const proxiedImageUrl = getImageProxyUrl(creative.imageUrl);
   const width = creative.imageWidth ?? 380;
   const height = creative.imageHeight ?? 213;
-  const isTall = height / width > 1.45;
-  const isWide = width / height > 2.4;
 
   return (
-    <article className={`overflow-hidden rounded-lg border border-[#d7dce2] bg-white text-[#202124] ${isTall ? "row-span-2" : ""} ${isWide ? "md:col-span-2" : ""}`}>
-      <div className="flex min-h-[210px] items-center justify-center bg-[#eef0f2] px-10 py-4">
-        {proxiedImageUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={proxiedImageUrl}
-            alt=""
-            width={width}
-            height={height}
-            className={`max-w-full bg-white object-contain ${isTall ? "max-h-[520px]" : "max-h-[230px]"}`}
-          />
-        ) : creative.scriptUrl ? (
-          <ScriptCreativePreview scriptUrl={creative.scriptUrl} />
-        ) : (
-          <div className="flex h-40 w-full items-center justify-center rounded-xl bg-white text-center text-sm font-bold text-[#5f6368]">
-            Không có ảnh xem trước
-          </div>
-        )}
+    <article className="group min-w-0 rounded-[2rem] outline-none">
+      <div className="overflow-hidden rounded-[2rem] border border-[#f6cf84]/20 bg-[#fffaf0] shadow-[0_24px_90px_rgba(0,0,0,0.38)] transition duration-500 group-hover:-translate-y-2 group-hover:border-[#ffd27a]/60 group-hover:shadow-[0_34px_120px_rgba(198,119,33,0.35)]">
+        <div className="relative p-3">
+          <div className="pointer-events-none absolute inset-3 rounded-[1.5rem] bg-[radial-gradient(circle_at_50%_0%,rgba(255,210,122,0.22),transparent_42%)] opacity-0 transition duration-500 group-hover:opacity-100" />
+          {proxiedImageUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={proxiedImageUrl}
+              alt=""
+              width={width}
+              height={height}
+              className="relative max-h-[430px] w-full rounded-[1.35rem] bg-white object-contain"
+            />
+          ) : creative.scriptUrl ? (
+            <div className="relative overflow-hidden rounded-[1.35rem] bg-white">
+              <ScriptCreativePreview scriptUrl={creative.scriptUrl} />
+            </div>
+          ) : (
+            <div className="relative flex aspect-[1.25] w-full items-center justify-center rounded-[1.35rem] border border-dashed border-[#b98535]/40 bg-[#f4ead7] text-center text-sm font-black uppercase tracking-[0.2em] text-[#7b4a16]">
+              Chưa có bản xem trước
+            </div>
+          )}
+        </div>
       </div>
-      <div className="border-t border-[#d7dce2] px-5 py-3 text-base font-semibold text-[#202124]">
-        {creative.advertiserName || "Nhà quảng cáo"}
+      <div className="px-2 pt-4">
+        <h3 className="truncate text-lg font-black uppercase leading-6 text-white">
+          {creative.advertiserName || "Nhà quảng cáo"}
+        </h3>
+        <div className="mt-3 rounded-[1.5rem] border border-white/10 bg-white/8 p-4 text-[15px] leading-7 text-[#d7dfef] backdrop-blur">
+          <div className="font-black text-[#7df0a7]">Đã xác minh</div>
+          <div><span className="text-[#ffd27a]">Lần đầu:</span> {formatDate(creative.firstShownAt)}</div>
+          <div><span className="text-[#ffd27a]">Lần cuối:</span> {formatDate(creative.lastShownAt)}</div>
+          <div><span className="text-[#ffd27a]">Lượng truy cập:</span> {creative.regionStats ?? "-"}</div>
+          {creative.domain && <div className="truncate"><span className="text-[#ffd27a]">Tên miền:</span> {creative.domain}</div>}
+        </div>
       </div>
     </article>
   );
@@ -286,8 +298,8 @@ async function RelatedCreativeGallery({ advertiserId }: { advertiserId: string }
   }
 
   return (
-    <div className="bg-white px-7 py-7 lg:px-12">
-      <div className="grid auto-rows-[minmax(240px,auto)] grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-4">
+    <div className="px-7 py-7 lg:px-12">
+      <div className="grid grid-cols-1 gap-7 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {creatives.map((creative) => (
           <CreativeCard key={creative.creativeId} creative={creative} />
         ))}
