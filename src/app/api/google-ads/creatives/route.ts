@@ -25,6 +25,10 @@ export async function GET(request: Request) {
   } catch (error) {
     const message = error instanceof Error ? error.message : "Cannot fetch creatives";
 
+    if (isEmptyGoogleAdsPageError(message)) {
+      return Response.json({ creatives: [], raw: null });
+    }
+
     return Response.json({ error: message }, { status: 502 });
   }
 }
@@ -69,8 +73,16 @@ export async function POST(request: Request) {
   } catch (error) {
     const message = error instanceof Error ? error.message : "Cannot fetch creatives";
 
+    if (isEmptyGoogleAdsPageError(message)) {
+      return Response.json({ creatives: [], raw: null });
+    }
+
     return Response.json({ error: message }, { status: 502 });
   }
+}
+
+function isEmptyGoogleAdsPageError(message: string) {
+  return message.includes("Google Ads Transparency creatives returned empty data");
 }
 
 function parseOptionalNumber(value: string | null) {

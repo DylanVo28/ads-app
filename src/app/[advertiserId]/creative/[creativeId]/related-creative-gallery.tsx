@@ -98,7 +98,6 @@ export function RelatedCreativeGallery({ advertiserId, initialCreatives, initial
       const url = new URL("/api/google-ads/creatives", window.location.origin);
       url.searchParams.set("advertiserId", advertiserId);
       url.searchParams.set("pageSize", "40");
-      url.searchParams.set("regionId", "2704");
       url.searchParams.set("nextPageToken", nextPageToken);
 
       const response = await fetch(url, { cache: "no-store" });

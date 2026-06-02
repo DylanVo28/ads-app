@@ -353,7 +353,6 @@ export async function fetchGoogleAdCreatives(
     id,
     limit: options?.limit ?? 40,
     pageSize: options?.pageSize ?? 25,
-    regionId: options?.regionId ?? 2704,
     topicIds: options?.topicIds ?? [],
     nextPageToken: options?.nextPageToken ?? '',
     language: options?.language ?? 'en-US',
@@ -378,13 +377,15 @@ async function fetchGoogleAdCreativesUncached(
   const regionId = options?.regionId ?? 2704
   const isDomainRequest = isDomain(id)
   const topicIds = options?.topicIds?.filter((topicId) => Number.isFinite(topicId)) ?? []
+  const nextPageToken = options?.nextPageToken ?? ''
   const requestPayloadJson = JSON.stringify({
     '2': options?.limit ?? 40,
     '3': {
       ...(!isDomainRequest && topicIds.length ? { '8': topicIds } : {}),
-      '12': { '1': options?.nextPageToken ?? (isDomainRequest ? id : ''), '2': true },
+      '12': { '1': isDomainRequest && !nextPageToken ? id : '', '2': true },
       ...(isDomainRequest ? {} : { '13': { '1': [id] } }),
     },
+    ...(nextPageToken ? { '4': nextPageToken } : {}),
     '7': {
       '1': 1,
       '2': options?.pageSize ?? 25,
@@ -447,7 +448,6 @@ export async function fetchGoogleAdCreativeById(
     advertiserId: normalizedAdvertiserId,
     creativeId: normalizedCreativeId,
     pageSize: options?.pageSize ?? 25,
-    regionId: options?.regionId ?? 2704,
     language: options?.language ?? 'en-US',
   })
 
@@ -469,7 +469,6 @@ async function fetchGoogleAdCreativeByIdUncached(
     language?: 'en-US' | string
   },
 ): Promise<GoogleAdCreativeByIdResult> {
-  const regionId = options?.regionId ?? 2704
   const body = new URLSearchParams({
     'f.req': JSON.stringify({
       '1': normalizedAdvertiserId,
@@ -477,7 +476,6 @@ async function fetchGoogleAdCreativeByIdUncached(
       '5': {
         '1': 1,
         '2': options?.pageSize ?? 25,
-        '3': regionId,
       },
     }),
   })
