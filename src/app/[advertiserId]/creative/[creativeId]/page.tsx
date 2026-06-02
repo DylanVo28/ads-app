@@ -342,10 +342,7 @@ export default async function Page({ params, searchParams }: PageProps) {
             </p>
           </div>
 
-          <button className="flex w-fit items-center gap-4 rounded-2xl border border-[#2f80ff] bg-[#dce9ff] px-5 py-4 text-xl font-black text-[#1a61d6] shadow-[0_0_0_4px_rgba(255,255,255,0.55)]">
-            Hiển thị ở Việt Nam
-            <CloseIcon />
-          </button>
+          
         </section>
 
         <section className="mt-9 overflow-hidden rounded-[2.5rem] border border-[#f6cf84]/25 bg-[#071226]/86 shadow-[0_36px_140px_rgba(0,0,0,0.52)] backdrop-blur-xl">
@@ -357,12 +354,7 @@ export default async function Page({ params, searchParams }: PageProps) {
             <p><span className="font-black text-white">Định dạng:</span> {creative?.format === 1 ? "Văn bản" : "Hình ảnh"}</p>
           </div>
 
-          <div className="flex justify-end border-b border-white/10 px-7 py-5 lg:px-12">
-            <button className="inline-flex items-center gap-4 rounded-full border border-white/10 bg-white/8 px-5 py-3 text-lg font-black text-white transition hover:bg-white/14">
-              <FlagIcon />
-              Báo quảng cáo này vi phạm
-            </button>
-          </div>
+          
 
           <RelatedCreativeGallery advertiserId={advertiserId} />
 
