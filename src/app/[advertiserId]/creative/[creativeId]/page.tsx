@@ -2,7 +2,7 @@ import Link from "next/link";
 import { headers } from "next/headers";
 
 import { fetchGoogleAdCreativeById, type GoogleAdCreative } from "../../../actions";
-import { ScriptCreativePreview } from "./script-creative-preview";
+import { RelatedCreativeGallery } from "./related-creative-gallery";
 
 type PageProps = {
   params: Promise<{
@@ -36,32 +36,9 @@ function BackIcon() {
   );
 }
 
-function CloseIcon() {
-  return (
-    <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path d="M6 6l12 12M18 6 6 18" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-function FlagIcon() {
-  return (
-    <svg className="h-7 w-7" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path d="M5 21V4m0 0h11l-1.5 4L16 12H5" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
-function ArrowRightIcon() {
-  return (
-    <svg className="h-7 w-7" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path d="M5 12h14m-6-6 6 6-6 6" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
 type CreativeGalleryApiResult = {
   creatives?: GoogleAdCreative[];
+  nextPageToken?: string;
 };
 
 type CreativeByIdRaw = {
@@ -74,9 +51,6 @@ type CreativeByIdRaw = {
   };
 };
 
-function getImageProxyUrl(imageUrl?: string) {
-  return imageUrl ? `/api/ad-image?url=${encodeURIComponent(imageUrl)}` : undefined;
-}
 
 function extractImagePreviewFromRaw(raw: unknown) {
   const variants = (raw as CreativeByIdRaw | undefined)?.["1"]?.["5"] ?? [];
@@ -199,7 +173,7 @@ async function fetchCreativeGallery(advertiserId: string) {
   const protocol = headersList.get("x-forwarded-proto") ?? "http";
 
   if (!host) {
-    return [];
+    return { creatives: [], nextPageToken: undefined };
   }
 
   const url = new URL(`/api/google-ads/creatives`, `${protocol}://${host}`);
@@ -210,15 +184,12 @@ async function fetchCreativeGallery(advertiserId: string) {
   const response = await fetch(url, { cache: "no-store" });
 
   if (!response.ok) {
-    return [];
+    return { creatives: [], nextPageToken: undefined };
   }
 
   const data = (await response.json()) as CreativeGalleryApiResult;
   const creatives = data.creatives ?? [];
-  console.log({
-    creatives
-  })
-  return Promise.all(
+  const resolvedCreatives = await Promise.all(
     creatives.map(async (creative) => {
       if (creative.imageUrl || !creative.scriptUrl) {
         return creative;
@@ -238,74 +209,8 @@ async function fetchCreativeGallery(advertiserId: string) {
       return scriptPreview ? { ...creative, ...scriptPreview } : creative;
     }),
   );
-}
 
-function CreativeCard({ creative }: { creative: GoogleAdCreative }) {
-  const proxiedImageUrl = getImageProxyUrl(creative.imageUrl);
-  const width = creative.imageWidth ?? 380;
-  const height = creative.imageHeight ?? 213;
-
-  return (
-    <article className="group min-w-0 rounded-[2rem] outline-none">
-      <div className="overflow-hidden rounded-[2rem] border border-[#f6cf84]/20 bg-[#fffaf0] shadow-[0_24px_90px_rgba(0,0,0,0.38)] transition duration-500 group-hover:-translate-y-2 group-hover:border-[#ffd27a]/60 group-hover:shadow-[0_34px_120px_rgba(198,119,33,0.35)]">
-        <div className="relative p-3">
-          <div className="pointer-events-none absolute inset-3 rounded-[1.5rem] bg-[radial-gradient(circle_at_50%_0%,rgba(255,210,122,0.22),transparent_42%)] opacity-0 transition duration-500 group-hover:opacity-100" />
-          {proxiedImageUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={proxiedImageUrl}
-              alt=""
-              width={width}
-              height={height}
-              className="relative max-h-[430px] w-full rounded-[1.35rem] bg-white object-contain"
-            />
-          ) : creative.scriptUrl ? (
-            <div className="relative overflow-hidden rounded-[1.35rem] bg-white">
-              <ScriptCreativePreview scriptUrl={creative.scriptUrl} />
-            </div>
-          ) : (
-            <div className="relative flex aspect-[1.25] w-full items-center justify-center rounded-[1.35rem] border border-dashed border-[#b98535]/40 bg-[#f4ead7] text-center text-sm font-black uppercase tracking-[0.2em] text-[#7b4a16]">
-              Chưa có bản xem trước
-            </div>
-          )}
-        </div>
-      </div>
-      <div className="px-2 pt-4">
-        <h3 className="truncate text-lg font-black uppercase leading-6 text-white">
-          {creative.advertiserName || "Nhà quảng cáo"}
-        </h3>
-        <div className="mt-3 rounded-[1.5rem] border border-white/10 bg-white/8 p-4 text-[15px] leading-7 text-[#d7dfef] backdrop-blur">
-          <div className="font-black text-[#7df0a7]">Đã xác minh</div>
-          <div><span className="text-[#ffd27a]">Lần đầu:</span> {formatDate(creative.firstShownAt)}</div>
-          <div><span className="text-[#ffd27a]">Lần cuối:</span> {formatDate(creative.lastShownAt)}</div>
-          <div><span className="text-[#ffd27a]">Lượng truy cập:</span> {creative.regionStats ?? "-"}</div>
-          {creative.domain && <div className="truncate"><span className="text-[#ffd27a]">Tên miền:</span> {creative.domain}</div>}
-        </div>
-      </div>
-    </article>
-  );
-}
-
-async function RelatedCreativeGallery({ advertiserId }: { advertiserId: string }) {
-  const creatives = await fetchCreativeGallery(advertiserId);
-  
-  if (!creatives.length) {
-    return (
-      <div className="bg-white px-7 py-10 text-center text-lg font-bold text-[#5f6368] lg:px-12">
-        Không thể tải thêm quảng cáo của nhà quảng cáo này.
-      </div>
-    );
-  }
-
-  return (
-    <div className="px-7 py-7 lg:px-12">
-      <div className="grid grid-cols-1 gap-7 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-        {creatives.map((creative) => (
-          <CreativeCard key={creative.creativeId} creative={creative} />
-        ))}
-      </div>
-    </div>
-  );
+  return { creatives: resolvedCreatives, nextPageToken: data.nextPageToken };
 }
 
 export default async function Page({ params, searchParams }: PageProps) {
@@ -316,6 +221,7 @@ export default async function Page({ params, searchParams }: PageProps) {
   const result = await fetchGoogleAdCreativeById(advertiserId, creativeId);
   const creative = result.creative;
   const advertiserName = creative?.advertiserName || advertiserNameParam || domain || advertiserId || "Nhà quảng cáo";
+  const { creatives, nextPageToken } = await fetchCreativeGallery(advertiserId);
   const backHref = advertiserId ? `/${encodeURIComponent(advertiserId)}` : "/";
 
   return (
@@ -356,16 +262,15 @@ export default async function Page({ params, searchParams }: PageProps) {
 
           
 
-          <RelatedCreativeGallery advertiserId={advertiserId} />
+          <RelatedCreativeGallery
+            advertiserId={advertiserId}
+            initialCreatives={creatives}
+            initialNextPageToken={nextPageToken}
+          />
 
         </section>
 
-        <div className="mt-10 flex justify-center">
-          <Link href={backHref} className="inline-flex items-center gap-5 rounded-full border border-[#2f80ff]/20 bg-[#dce9ff] px-8 py-5 text-xl font-black text-[#1a61d6] shadow-[0_18px_70px_rgba(47,128,255,0.22)] transition hover:-translate-y-1 hover:shadow-[0_24px_90px_rgba(47,128,255,0.28)] md:text-2xl">
-            Xem thêm quảng cáo của nhà quảng cáo này
-            <ArrowRightIcon />
-          </Link>
-        </div>
+        
       </div>
     </main>
   );
