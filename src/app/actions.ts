@@ -381,6 +381,7 @@ async function fetchGoogleAdCreativesUncached(
   const requestPayloadJson = JSON.stringify({
     '2': options?.limit ?? 40,
     '3': {
+      "4":1,
       ...(!isDomainRequest && topicIds.length ? { '8': topicIds } : {}),
       '12': { '1': isDomainRequest && !nextPageToken ? id : '', '2': true },
       ...(isDomainRequest ? {} : { '13': { '1': [id] } }),
@@ -392,7 +393,7 @@ async function fetchGoogleAdCreativesUncached(
       '3': regionId,
     },
   })
-
+  
   const response = await postGoogleAdsRpcWithCurl(
     SEARCH_CREATIVES_URL,
     buildGoogleAdsTransparencyHeaders({

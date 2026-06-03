@@ -117,7 +117,7 @@ export default async function Page({ params, searchParams }: PageProps) {
               <p><span className="font-black text-white">Lần hiển thị gần đây nhất:</span> {formatDate(creative?.lastShownAt)}</p>
               <p><span className="font-black text-white">Bên tài trợ cho quảng cáo:</span> {advertiserName} <span className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-[#d7dfef] text-sm font-black">i</span></p>
             </div>
-            <p><span className="font-black text-white">Định dạng:</span> {creative?.format === 1 ? "Văn bản" : "Hình ảnh"}</p>
+            <p><span className="font-black text-white">Định dạng:</span> Văn bản</p>
           </div>
 
           
