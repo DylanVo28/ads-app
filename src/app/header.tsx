@@ -29,6 +29,14 @@ export async function Header() {
         </Link>
 
         <div className="flex min-w-0 items-center gap-3">
+          {user.role === "admin" && (
+            <Link
+              href="/dashboard"
+              className="rounded-full border border-[#f6cf84]/30 bg-white/8 px-5 py-3 text-sm font-black text-[#ffd98b] transition hover:border-[#ffd27a]/60 hover:bg-white/14 md:text-base"
+            >
+              Dashboard
+            </Link>
+          )}
           <span className="hidden max-w-[240px] truncate text-sm font-bold text-[#d7dfef] sm:block">
             {user.name || user.email}
           </span>

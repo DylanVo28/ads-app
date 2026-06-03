@@ -11,6 +11,7 @@ type StoredUser = {
   id: string;
   email: string;
   name: string;
+  role: "user" | "admin";
   password_hash: string;
 };
 
@@ -54,9 +55,9 @@ export async function registerUser(formData: FormData): Promise<AuthResult> {
   try {
     const result = await db.query<StoredUser>(
       `
-        INSERT INTO users (id, email, name, password_hash)
-        VALUES ($1, $2, $3, $4)
-        RETURNING id, email, name, password_hash
+        INSERT INTO users (id, email, name, role, password_hash)
+        VALUES ($1, $2, $3, 'user', $4)
+        RETURNING id, email, name, role, password_hash
       `,
       [randomBytes(16).toString("hex"), email, name, hashPassword(password)],
     );
@@ -81,7 +82,7 @@ export async function loginUser(formData: FormData): Promise<AuthResult> {
   await ensureUsersTable();
 
   const result = await db.query<StoredUser>(
-    "SELECT id, email, name, password_hash FROM users WHERE email = $1 LIMIT 1",
+    "SELECT id, email, name, role, password_hash FROM users WHERE email = $1 LIMIT 1",
     [email],
   );
   const user = result.rows[0];
@@ -105,6 +106,7 @@ function toAuthUser(user: StoredUser): AuthUser {
     id: user.id,
     email: user.email,
     name: user.name,
+    role: user.role === "admin" ? "admin" : "user",
   };
 }
 

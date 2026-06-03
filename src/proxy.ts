@@ -13,6 +13,10 @@ export function proxy(request: NextRequest) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
 
+  if (pathname.startsWith("/dashboard") && user?.role !== "admin") {
+    return NextResponse.redirect(new URL("/", request.url));
+  }
+
   if (user && isPublicPath) {
     return NextResponse.redirect(new URL("/", request.url));
   }

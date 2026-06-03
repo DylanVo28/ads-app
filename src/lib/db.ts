@@ -24,8 +24,11 @@ export async function ensureUsersTable() {
       id TEXT PRIMARY KEY,
       email TEXT NOT NULL UNIQUE,
       name TEXT NOT NULL,
+      role TEXT NOT NULL DEFAULT 'user',
       password_hash TEXT NOT NULL,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `);
+
+  await db.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS role TEXT NOT NULL DEFAULT 'user'");
 }

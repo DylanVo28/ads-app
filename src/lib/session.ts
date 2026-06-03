@@ -7,6 +7,7 @@ export type AuthUser = {
   id: string;
   email: string;
   name: string;
+  role: "user" | "admin";
 };
 
 function getSessionSecret() {
@@ -19,7 +20,7 @@ function signPayload(payload: string) {
 
 export function createSessionToken(user: AuthUser) {
   const payload = Buffer.from(
-    JSON.stringify({ id: user.id, email: user.email, name: user.name, exp: Math.floor(Date.now() / 1000) + SESSION_TTL_SECONDS }),
+    JSON.stringify({ id: user.id, email: user.email, name: user.name, role: user.role, exp: Math.floor(Date.now() / 1000) + SESSION_TTL_SECONDS }),
   ).toString("base64url");
 
   return `${payload}.${signPayload(payload)}`;
@@ -43,7 +44,7 @@ export function verifySessionToken(token?: string): AuthUser | null {
       return null;
     }
 
-    return { id: session.id, email: session.email, name: session.name };
+    return { id: session.id, email: session.email, name: session.name, role: session.role === "admin" ? "admin" : "user" };
   } catch {
     return null;
   }
