@@ -81,8 +81,12 @@ export default async function Page({ params, searchParams }: PageProps) {
   const result = await fetchCreativeDetail(advertiserId, creativeId);
   const creative = result.creative;
   const advertiserName = creative?.advertiserName || advertiserNameParam || domain || advertiserId || "Nhà quảng cáo";
+  const exportDomain = creative?.domain || domain;
   const { creatives, nextPageToken } = await fetchCreativeGallery(advertiserId);
   const backHref = advertiserId ? `/${encodeURIComponent(advertiserId)}` : "/";
+  const exportHref = exportDomain
+    ? `/api/google-ads/creatives/export?advertiserId=${encodeURIComponent(advertiserId)}&domain=${encodeURIComponent(exportDomain)}`
+    : undefined;
 
   return (
     <main className="min-h-screen overflow-hidden bg-[#050914] text-[#fff8e1]">
@@ -107,8 +111,14 @@ export default async function Page({ params, searchParams }: PageProps) {
               Thông tin về quảng cáo này có thể khác nhau theo vị trí
             </p>
           </div>
-
-          
+          {exportHref && (
+            <Link
+              href={exportHref}
+              className="inline-flex w-fit items-center justify-center rounded-full border border-[#7df0a7]/35 bg-[#7df0a7]/12 px-7 py-4 text-lg font-black uppercase tracking-[0.18em] text-[#9dffbb] shadow-[0_18px_70px_rgba(125,240,167,0.16)] backdrop-blur transition hover:-translate-y-1 hover:bg-[#7df0a7]/20 hover:text-white"
+            >
+              Excel
+            </Link>
+          )}
         </section>
 
         <section className="mt-9 overflow-hidden rounded-[2.5rem] border border-[#f6cf84]/25 bg-[#071226]/86 shadow-[0_36px_140px_rgba(0,0,0,0.52)] backdrop-blur-xl">
