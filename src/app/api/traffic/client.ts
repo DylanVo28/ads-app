@@ -1,9 +1,8 @@
 import type { TrafficApiResponse } from "./types";
 
 const TRAFFIC_API_URL = "https://traffic.workfast.cc/";
-const DEFAULT_TRAFFIC_TIMESTAMP = "1780560383237";
 const DEFAULT_TRAFFIC_CLIENT_ID = "ab11def3ae47cc5cfd9f667b0bf35392c08815a8b39dda29___";
-const DEFAULT_TRAFFIC_SIGN = "8a1cce7a33ab697a8504bc690e9ec626";
+const TRAFFIC_SIGN_SECRET = "2@3&^8d4$%H9,M";
 
 type FetchTrafficOptions = {
   domain: string;
@@ -15,17 +14,20 @@ type FetchTrafficOptions = {
 
 export async function fetchTrafficOverview({
   domain,
-  timestamp = process.env.TRAFFIC_TIMESTAMP || DEFAULT_TRAFFIC_TIMESTAMP,
+  timestamp = Date.now().toString(),
   source = "extension",
   clientId = process.env.TRAFFIC_CLIENT_ID || DEFAULT_TRAFFIC_CLIENT_ID,
-  sign = process.env.TRAFFIC_SIGN || DEFAULT_TRAFFIC_SIGN,
+  sign,
 }: FetchTrafficOptions): Promise<TrafficApiResponse> {
+  const trafficSign = sign
+    ? { timestamp, clientId, sign }
+    : await createTrafficSign(clientId, timestamp);
   const upstreamUrl = new URL(TRAFFIC_API_URL);
   upstreamUrl.searchParams.set("domain", domain);
-  upstreamUrl.searchParams.set("timestamp", timestamp);
+  upstreamUrl.searchParams.set("timestamp", trafficSign.timestamp);
   upstreamUrl.searchParams.set("source", source);
-  upstreamUrl.searchParams.set("clientId", clientId);
-  upstreamUrl.searchParams.set("sign", sign);
+  upstreamUrl.searchParams.set("clientId", trafficSign.clientId);
+  upstreamUrl.searchParams.set("sign", trafficSign.sign);
 
   const response = await fetch(upstreamUrl, {
     cache: "no-store",
@@ -51,4 +53,20 @@ export async function fetchTrafficOverview({
   }
 
   return (await response.json()) as TrafficApiResponse;
+}
+
+async function createTrafficSign(clientId: string, timestamp = Date.now().toString()) {
+  const raw = clientId + timestamp + TRAFFIC_SIGN_SECRET;
+  const bytes = new TextEncoder().encode(raw);
+  const hashBuffer = await crypto.subtle.digest("SHA-256", bytes);
+  const sign = Array.from(new Uint8Array(hashBuffer))
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("")
+    .substring(0, 32);
+
+  return {
+    timestamp,
+    clientId,
+    sign,
+  };
 }
