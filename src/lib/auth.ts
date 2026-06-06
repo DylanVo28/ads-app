@@ -41,14 +41,14 @@ function verifyPassword(password: string, storedHash: string) {
 }
 
 export async function getCurrentUser() {
-  await ensureUsersTable();
-
   const token = (await cookies()).get(SESSION_COOKIE)?.value;
   const user = verifySessionToken(token);
 
   if (!token || !user) {
     return null;
   }
+
+  await ensureUsersTable();
 
   const activeSession = await db.query<{ user_id: string }>(
     `
@@ -77,8 +77,6 @@ export async function registerUser(formData: FormData): Promise<AuthResult> {
     return { ok: false, error: "Vui lòng nhập tên, email và mật khẩu tối thiểu 8 ký tự." };
   }
 
-  await ensureUsersTable();
-
   try {
     const result = await db.query<StoredUser>(
       `
@@ -105,8 +103,6 @@ export async function loginUser(formData: FormData): Promise<AuthResult> {
 
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const password = String(formData.get("password") ?? "");
-
-  await ensureUsersTable();
 
   const result = await db.query<StoredUser>(
     "SELECT id, email, name, role, password_hash FROM users WHERE email = $1 LIMIT 1",
@@ -140,8 +136,6 @@ export async function loginUser(formData: FormData): Promise<AuthResult> {
 export async function logoutUser() {
   "use server";
 
-  await ensureUsersTable();
-
   const cookieStore = await cookies();
   const token = cookieStore.get(SESSION_COOKIE)?.value;
 
@@ -157,7 +151,6 @@ export async function invalidateCurrentSession(token?: string) {
     return;
   }
 
-  await ensureUsersTable();
   await db.query("UPDATE user_sessions SET logged_out_at = NOW() WHERE session_token_hash = $1", [hashSessionToken(token)]);
 }
 

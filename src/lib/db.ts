@@ -10,6 +10,7 @@ if (!connectionString) {
 
 declare global {
   var postgresPool: Pool | undefined;
+  var authSchemaReady: Promise<void> | undefined;
 }
 
 export const db = globalThis.postgresPool ?? new Pool({ connectionString });
@@ -19,6 +20,18 @@ if (process.env.NODE_ENV !== "production") {
 }
 
 export async function ensureUsersTable() {
+  if (globalThis.authSchemaReady) {
+    return globalThis.authSchemaReady;
+  }
+
+  globalThis.authSchemaReady = ensureAuthSchema().catch((error) => {
+    globalThis.authSchemaReady = undefined;
+    throw error;
+  });
+  return globalThis.authSchemaReady;
+}
+
+async function ensureAuthSchema() {
   await db.query("SELECT pg_advisory_lock(hashtext('ad_app_auth_schema'))");
 
   try {
