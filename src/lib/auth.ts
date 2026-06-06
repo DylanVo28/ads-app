@@ -63,7 +63,11 @@ export async function getCurrentUser() {
     [hashSessionToken(token), user.id],
   );
 
-  return activeSession.rows[0] ? user : null;
+  if (activeSession.rows[0]) {
+    return user;
+  }
+
+  return (await claimLegacySession(user, token)) ? user : null;
 }
 
 export async function registerUser(formData: FormData): Promise<AuthResult> {
@@ -195,4 +199,28 @@ async function hasActiveSession(userId: string) {
   );
 
   return Boolean(result.rows[0]);
+}
+
+async function claimLegacySession(user: AuthUser, token: string) {
+  await cleanupExpiredSessions(user.id);
+
+  const expiresAt = new Date(Date.now() + SESSION_TTL_SECONDS * 1000);
+
+  try {
+    await db.query(
+      `
+        INSERT INTO user_sessions (id, user_id, session_token_hash, device_id, expires_at)
+        VALUES ($1, $2, $3, $4, $5)
+      `,
+      [randomBytes(16).toString("hex"), user.id, hashSessionToken(token), randomBytes(16).toString("hex"), expiresAt],
+    );
+
+    return true;
+  } catch (error) {
+    if ((error as { code?: string }).code === "23505") {
+      return false;
+    }
+
+    throw error;
+  }
 }
