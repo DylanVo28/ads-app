@@ -208,8 +208,6 @@ export default async function Page({ params }: PageProps) {
   const { slug } = await params;
   const advertiserId = slug[0] || DEFAULT_ADVERTISER_ID;
   const result = await fetchGoogleAdCreatives(advertiserId, { pageSize: 40 }).catch((error) => {
-    console.error(error);
-
     return { creatives: [], raw: null };
   });
   const decodedTarget = decodeURIComponent(advertiserId);

@@ -4,7 +4,7 @@ import { randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
 
 import { db, ensureUsersTable } from "./db";
-import { createSessionToken, SESSION_COOKIE, SESSION_TTL_SECONDS, verifySessionToken } from "./session";
+import { createSessionToken, hashSessionToken, SESSION_COOKIE, SESSION_TTL_SECONDS, verifySessionToken } from "./session";
 import type { AuthUser } from "./session";
 
 type StoredUser = {
@@ -13,6 +13,11 @@ type StoredUser = {
   name: string;
   role: "user" | "admin";
   password_hash: string;
+};
+
+type SessionRequestMeta = {
+  userAgent?: string;
+  ipAddress?: string;
 };
 
 export type AuthResult = { ok: true } | { ok: false; error: string };
@@ -36,7 +41,29 @@ function verifyPassword(password: string, storedHash: string) {
 }
 
 export async function getCurrentUser() {
-  return verifySessionToken((await cookies()).get(SESSION_COOKIE)?.value);
+  await ensureUsersTable();
+
+  const token = (await cookies()).get(SESSION_COOKIE)?.value;
+  const user = verifySessionToken(token);
+
+  if (!token || !user) {
+    return null;
+  }
+
+  const activeSession = await db.query<{ user_id: string }>(
+    `
+      UPDATE user_sessions
+      SET last_seen_at = NOW()
+      WHERE session_token_hash = $1
+        AND user_id = $2
+        AND logged_out_at IS NULL
+        AND expires_at > NOW()
+      RETURNING user_id
+    `,
+    [hashSessionToken(token), user.id],
+  );
+
+  return activeSession.rows[0] ? user : null;
 }
 
 export async function registerUser(formData: FormData): Promise<AuthResult> {
@@ -91,14 +118,47 @@ export async function loginUser(formData: FormData): Promise<AuthResult> {
     return { ok: false, error: "Email hoặc mật khẩu không đúng." };
   }
 
-  await setSessionCookie(toAuthUser(user));
+  await cleanupExpiredSessions(user.id);
+
+  if (await hasActiveSession(user.id)) {
+    return { ok: false, error: "Tài khoản này đang đăng nhập trên thiết bị khác. Vui lòng logout khỏi thiết bị cũ trước khi đăng nhập lại." };
+  }
+
+  try {
+    await setSessionCookie(toAuthUser(user));
+  } catch (error) {
+    if ((error as { code?: string }).code === "23505") {
+      return { ok: false, error: "Tài khoản này đang đăng nhập trên thiết bị khác. Vui lòng logout khỏi thiết bị cũ trước khi đăng nhập lại." };
+    }
+
+    throw error;
+  }
+
   return { ok: true };
 }
 
 export async function logoutUser() {
   "use server";
 
-  (await cookies()).delete(SESSION_COOKIE);
+  await ensureUsersTable();
+
+  const cookieStore = await cookies();
+  const token = cookieStore.get(SESSION_COOKIE)?.value;
+
+  if (token) {
+    await db.query("UPDATE user_sessions SET logged_out_at = NOW() WHERE session_token_hash = $1", [hashSessionToken(token)]);
+  }
+
+  cookieStore.delete(SESSION_COOKIE);
+}
+
+export async function invalidateCurrentSession(token?: string) {
+  if (!token) {
+    return;
+  }
+
+  await ensureUsersTable();
+  await db.query("UPDATE user_sessions SET logged_out_at = NOW() WHERE session_token_hash = $1", [hashSessionToken(token)]);
 }
 
 function toAuthUser(user: StoredUser): AuthUser {
@@ -110,12 +170,36 @@ function toAuthUser(user: StoredUser): AuthUser {
   };
 }
 
-async function setSessionCookie(user: AuthUser) {
-  (await cookies()).set(SESSION_COOKIE, createSessionToken(user), {
+async function setSessionCookie(user: AuthUser, meta: SessionRequestMeta = {}) {
+  const token = createSessionToken(user);
+  const expiresAt = new Date(Date.now() + SESSION_TTL_SECONDS * 1000);
+
+  await db.query(
+    `
+      INSERT INTO user_sessions (id, user_id, session_token_hash, device_id, user_agent, ip_address, expires_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7)
+    `,
+    [randomBytes(16).toString("hex"), user.id, hashSessionToken(token), randomBytes(16).toString("hex"), meta.userAgent ?? null, meta.ipAddress ?? null, expiresAt],
+  );
+
+  (await cookies()).set(SESSION_COOKIE, token, {
     httpOnly: true,
     maxAge: SESSION_TTL_SECONDS,
     path: "/",
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
   });
+}
+
+async function cleanupExpiredSessions(userId: string) {
+  await db.query("DELETE FROM user_sessions WHERE user_id = $1 AND (expires_at <= NOW() OR logged_out_at IS NOT NULL)", [userId]);
+}
+
+async function hasActiveSession(userId: string) {
+  const result = await db.query<{ id: string }>(
+    "SELECT id FROM user_sessions WHERE user_id = $1 AND logged_out_at IS NULL AND expires_at > NOW() LIMIT 1",
+    [userId],
+  );
+
+  return Boolean(result.rows[0]);
 }

@@ -131,7 +131,7 @@ function buildWorksheets({
         ["Ten creative", "Domain creative", "Time lan dau", "Time lan cuoi"],
         ...creatives.map((creative) => [
           creative.advertiserName || creative.creativeId || "-",
-          creative.domain || domain || "-",
+          creative.imageUrl || "-",
           formatDate(creative.firstShownAt),
           formatDate(creative.lastShownAt),
         ]),

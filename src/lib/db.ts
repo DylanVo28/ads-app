@@ -19,16 +19,39 @@ if (process.env.NODE_ENV !== "production") {
 }
 
 export async function ensureUsersTable() {
-  await db.query(`
-    CREATE TABLE IF NOT EXISTS users (
-      id TEXT PRIMARY KEY,
-      email TEXT NOT NULL UNIQUE,
-      name TEXT NOT NULL,
-      role TEXT NOT NULL DEFAULT 'user',
-      password_hash TEXT NOT NULL,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    )
-  `);
+  await db.query("SELECT pg_advisory_lock(hashtext('ad_app_auth_schema'))");
 
-  await db.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS role TEXT NOT NULL DEFAULT 'user'");
+  try {
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS users (
+        id TEXT PRIMARY KEY,
+        email TEXT NOT NULL UNIQUE,
+        name TEXT NOT NULL,
+        role TEXT NOT NULL DEFAULT 'user',
+        password_hash TEXT NOT NULL,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+
+    await db.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS role TEXT NOT NULL DEFAULT 'user'");
+
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS user_sessions (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+        session_token_hash TEXT NOT NULL UNIQUE,
+        device_id TEXT NOT NULL,
+        user_agent TEXT,
+        ip_address TEXT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        last_seen_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        expires_at TIMESTAMPTZ NOT NULL,
+        logged_out_at TIMESTAMPTZ NULL
+      )
+    `);
+
+    await db.query("CREATE INDEX IF NOT EXISTS user_sessions_active_idx ON user_sessions (user_id, expires_at) WHERE logged_out_at IS NULL");
+  } finally {
+    await db.query("SELECT pg_advisory_unlock(hashtext('ad_app_auth_schema'))");
+  }
 }
