@@ -6,10 +6,6 @@ import { getCurrentUser, logoutUser } from "@/lib/auth";
 export async function Header() {
   const user = await getCurrentUser();
 
-  if (!user) {
-    return null;
-  }
-
   async function handleLogout() {
     "use server";
 
@@ -29,7 +25,7 @@ export async function Header() {
         </Link>
 
         <div className="flex min-w-0 items-center gap-3">
-          {user.role === "admin" && (
+          {user?.role === "admin" && (
             <Link
               href="/dashboard"
               className="rounded-full border border-[#f6cf84]/30 bg-white/8 px-5 py-3 text-sm font-black text-[#ffd98b] transition hover:border-[#ffd27a]/60 hover:bg-white/14 md:text-base"
@@ -37,17 +33,28 @@ export async function Header() {
               Dashboard
             </Link>
           )}
-          <span className="hidden max-w-[240px] truncate text-sm font-bold text-[#d7dfef] sm:block">
-            {user.name || user.email}
-          </span>
-          <form action={handleLogout}>
-            <button
-              type="submit"
+          {user ? (
+            <>
+              <span className="hidden max-w-[240px] truncate text-sm font-bold text-[#d7dfef] sm:block">
+                {user.name || user.email}
+              </span>
+              <form action={handleLogout}>
+                <button
+                  type="submit"
+                  className="rounded-full border border-[#f6cf84]/30 bg-[#f6cf84]/10 px-5 py-3 text-sm font-black text-[#ffd98b] shadow-2xl transition hover:border-[#ffd27a]/60 hover:bg-[#f6cf84]/18 md:text-base"
+                >
+                  Đăng xuất
+                </button>
+              </form>
+            </>
+          ) : (
+            <Link
+              href="/login"
               className="rounded-full border border-[#f6cf84]/30 bg-[#f6cf84]/10 px-5 py-3 text-sm font-black text-[#ffd98b] shadow-2xl transition hover:border-[#ffd27a]/60 hover:bg-[#f6cf84]/18 md:text-base"
             >
-              Đăng xuất
-            </button>
-          </form>
+              Đăng nhập
+            </Link>
+          )}
         </div>
       </div>
     </header>
