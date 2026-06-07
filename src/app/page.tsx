@@ -32,6 +32,12 @@ function getSuggestionName(suggestion: GoogleAdSearchSuggestion) {
   return suggestion.type === "advertiser" ? suggestion.name : suggestion.domain;
 }
 
+function getSuggestionKey(suggestion: GoogleAdSearchSuggestion, index: number) {
+  const stableId = suggestion.type === "advertiser" ? suggestion.advertiserId : suggestion.domain;
+
+  return `${suggestion.type}-${stableId || getSuggestionName(suggestion)}-${index}`;
+}
+
 function SearchIcon() {
   return (
     <svg className="h-6 w-6 shrink-0 md:h-8 md:w-8" viewBox="0 0 48 48" fill="none" aria-hidden="true">
@@ -181,13 +187,13 @@ export default function Home() {
                         <div>% số quảng cáo</div>
                       </div>
 
-                      {suggestions.map((suggestion) => {
+                      {suggestions.map((suggestion, index) => {
                         const label = getSuggestionName(suggestion);
                         const headquarters = suggestion.type === "advertiser" ? suggestion.region || "-" : "-";
                         const verified = suggestion.type === "advertiser" && suggestion.verified;
 
                         return (
-                          <button key={`${suggestion.type}-${label}`} type="button" onClick={() => handleSuggestionClick(suggestion)} className="grid min-w-[640px] w-full grid-cols-[1.5fr_1fr_1fr] gap-4 px-6 py-4 text-left transition hover:bg-white/10">
+                          <button key={getSuggestionKey(suggestion, index)} type="button" onClick={() => handleSuggestionClick(suggestion)} className="grid min-w-[640px] w-full grid-cols-[1.5fr_1fr_1fr] gap-4 px-6 py-4 text-left transition hover:bg-white/10">
                             <div>
                               <div className="text-base font-black text-[#fff8e1]">{label}</div>
                               {verified && <div className="mt-1 text-sm font-semibold text-[#d7dfef]">Đã xác minh</div>}

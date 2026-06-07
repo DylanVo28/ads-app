@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { headers } from "next/headers";
 
-import { fetchGoogleAdCreativeById, type GoogleAdCreative, type GoogleAdCreativeByIdResult } from "../../../actions";
+import { fetchGoogleAdCreativeById, fetchGoogleAdSearchSuggestions, type GoogleAdCreative, type GoogleAdCreativeByIdResult } from "../../../actions";
 import { RelatedCreativeGallery } from "./related-creative-gallery";
 
 type PageProps = {
@@ -12,6 +12,8 @@ type PageProps = {
   searchParams: Promise<{
     advertiserName?: string;
     domain?: string;
+    headquarters?: string;
+    legalName?: string;
   }>;
 };
 
@@ -26,6 +28,25 @@ function formatDate(value?: string) {
     day: "2-digit",
     timeZone: "Asia/Ho_Chi_Minh",
   }).format(new Date(value));
+}
+
+const regionNameFormatter = new Intl.DisplayNames(["vi"], { type: "region" });
+
+function formatHeadquarters(value?: string) {
+  if (!value) {
+    return "-";
+  }
+
+  return value
+    .split(/[,;]+/)
+    .map((region) => region.trim())
+    .filter(Boolean)
+    .map((region) => {
+      const regionCode = region.toUpperCase();
+
+      return /^[A-Z]{2}$/.test(regionCode) ? regionNameFormatter.of(regionCode) || region : region;
+    })
+    .join(", ");
 }
 
 function BackIcon() {
@@ -73,14 +94,34 @@ async function fetchCreativeDetail(advertiserId: string, creativeId: string): Pr
   });
 }
 
+async function fetchAdvertiserHeadquarters(advertiserId: string, advertiserName: string) {
+  const result = await fetchGoogleAdSearchSuggestions(advertiserName, { limit: 10 }).catch((error) => {
+    console.error("Cannot fetch Google ad advertiser headquarters", error);
+
+    return { suggestions: [], raw: null };
+  });
+  const normalizedName = advertiserName.trim().toLowerCase();
+  const suggestion = result.suggestions.find((item) => {
+    if (item.type !== "advertiser") {
+      return false;
+    }
+
+    return item.advertiserId === advertiserId || item.name.trim().toLowerCase() === normalizedName;
+  });
+
+  return suggestion?.type === "advertiser" ? suggestion.region : undefined;
+}
+
 export default async function Page({ params, searchParams }: PageProps) {
   const { advertiserId: advertiserIdParam, creativeId: creativeIdParam } = await params;
-  const { advertiserName: advertiserNameParam, domain } = await searchParams;
+  const { advertiserName: advertiserNameParam, domain, headquarters: headquartersParam, legalName: legalNameParam } = await searchParams;
   const advertiserId = decodeURIComponent(advertiserIdParam);
   const creativeId = decodeURIComponent(creativeIdParam);
   const result = await fetchCreativeDetail(advertiserId, creativeId);
   const creative = result.creative;
   const advertiserName = creative?.advertiserName || advertiserNameParam || domain || advertiserId || "Nhà quảng cáo";
+  const legalName = legalNameParam || advertiserName;
+  const headquarters = formatHeadquarters(headquartersParam || await fetchAdvertiserHeadquarters(advertiserId, advertiserName));
   const exportDomain = creative?.domain || domain;
   const { creatives, nextPageToken } = await fetchCreativeGallery(advertiserId);
   const backHref = advertiserId ? `/${encodeURIComponent(advertiserId)}` : "/";
@@ -110,6 +151,14 @@ export default async function Page({ params, searchParams }: PageProps) {
             <p className="mt-7 text-xl font-semibold leading-8 text-[#d7dfef] md:text-2xl">
               Thông tin về quảng cáo này có thể khác nhau theo vị trí
             </p>
+            <div className="mt-5 grid gap-3 text-lg font-bold leading-tight text-[#d7dfef] md:text-2xl">
+              <p className="rounded-2xl border border-white/10 bg-white/8 px-5 py-4">
+                <span className="text-[#ffd27a]">Tên pháp lý:</span> {legalName}
+              </p>
+              <p className="rounded-2xl border border-white/10 bg-white/8 px-5 py-4">
+                <span className="text-[#ffd27a]">Trụ sở ở:</span> {headquarters}
+              </p>
+            </div>
           </div>
           {exportHref && (
             <Link

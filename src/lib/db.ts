@@ -13,7 +13,23 @@ declare global {
   var authSchemaReady: Promise<void> | undefined;
 }
 
-export const db = globalThis.postgresPool ?? new Pool({ connectionString });
+const normalizedConnectionString = normalizeSslMode(connectionString);
+
+export const db = globalThis.postgresPool ?? new Pool({ connectionString: normalizedConnectionString });
+
+function normalizeSslMode(url: string) {
+  const parsedUrl = new URL(url);
+
+  if (!parsedUrl.searchParams.has("uselibpqcompat")) {
+    const sslMode = parsedUrl.searchParams.get("sslmode");
+
+    if (sslMode === "prefer" || sslMode === "require" || sslMode === "verify-ca") {
+      parsedUrl.searchParams.set("sslmode", "verify-full");
+    }
+  }
+
+  return parsedUrl.toString();
+}
 
 if (process.env.NODE_ENV !== "production") {
   globalThis.postgresPool = db;

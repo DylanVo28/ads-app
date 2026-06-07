@@ -1,43 +1,12 @@
-import Link from "next/link";
-
 import { fetchGoogleAdCreatives } from "../actions";
 import { SearchControls } from "../search-controls";
+import { CreativeGrid } from "./creative-grid";
 
 const DEFAULT_ADVERTISER_ID = "AR02768355324216737793";
 
 type PageProps = {
   params: Promise<{ slug: string[] }>;
 };
-
-function formatDate(value?: string) {
-  if (!value) {
-    return "-";
-  }
-
-  return new Intl.DateTimeFormat("vi-VN", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: false,
-    timeZone: "Asia/Ho_Chi_Minh",
-  }).format(new Date(value));
-}
-
-function hostnameFromUrl(value?: string) {
-  if (!value) {
-    return "googleads.g.doubleclick.net";
-  }
-
-  try {
-    return new URL(value).hostname.replace(/^www\./, "");
-  } catch {
-    return "googleads.g.doubleclick.net";
-  }
-}
-
 
 function getTime(value?: string) {
   if (!value) {
@@ -51,48 +20,6 @@ function getTime(value?: string) {
 
 function sortCreativesByLastShownDesc<T extends { lastShownAt?: string }>(creatives: T[]) {
   return [...creatives].sort((a, b) => getTime(b.lastShownAt) - getTime(a.lastShownAt));
-}
-
-function dedupeCreativesByAdvertiserName<T extends { advertiserName?: string; creativeId: string }>(creatives: T[]) {
-  const seenAdvertiserNames = new Set<string>();
-
-  return creatives.filter((creative) => {
-    const advertiserNameKey = creative.advertiserName?.trim().toLowerCase();
-
-    if (!advertiserNameKey) {
-      return true;
-    }
-
-    if (seenAdvertiserNames.has(advertiserNameKey)) {
-      return false;
-    }
-
-    seenAdvertiserNames.add(advertiserNameKey);
-    return true;
-  });
-}
-
-function AdPreview({ imageUrl }: { imageUrl?: string }) {
-  const host = hostnameFromUrl(imageUrl);
-  const proxiedImageUrl = imageUrl
-    ? `/api/ad-image?url=${encodeURIComponent(imageUrl)}`
-    : undefined;
-
-  return (
-    <div className="group overflow-hidden rounded-[2rem] border border-[#f6cf84]/20 bg-[#fffaf0] shadow-[0_24px_90px_rgba(0,0,0,0.38)] transition duration-500 hover:-translate-y-2 hover:border-[#ffd27a]/60 hover:shadow-[0_34px_120px_rgba(198,119,33,0.35)]">
-      <div className="relative p-3">
-        <div className="pointer-events-none absolute inset-3 rounded-[1.5rem] bg-[radial-gradient(circle_at_50%_0%,rgba(255,210,122,0.22),transparent_42%)] opacity-0 transition duration-500 group-hover:opacity-100" />
-        {proxiedImageUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={proxiedImageUrl} alt="" className="relative max-h-[430px] w-full rounded-[1.35rem] bg-white object-contain" />
-        ) : (
-          <div className="relative flex aspect-[1.25] w-full items-center justify-center rounded-[1.35rem] border border-dashed border-[#b98535]/40 bg-[#f4ead7] text-sm font-black uppercase tracking-[0.2em] text-[#7b4a16]">
-            Chưa có bản xem trước
-          </div>
-        )}
-      </div>
-    </div>
-  );
 }
 
 function VerifiedAdvertiserCard({
@@ -118,12 +45,12 @@ function VerifiedAdvertiserCard({
             {name}
           </h1>
           <div className="mt-7 grid gap-3 text-lg font-bold leading-tight text-[#d7dfef] md:text-2xl">
-            <p className="rounded-2xl border border-white/10 bg-white/8 px-5 py-4">
+            {/* <p className="rounded-2xl border border-white/10 bg-white/8 px-5 py-4">
               <span className="text-[#ffd27a]">Tên pháp lý:</span> {legalName}
-            </p>
-            <p className="rounded-2xl border border-white/10 bg-white/8 px-5 py-4">
+            </p> */}
+            {/* <p className="rounded-2xl border border-white/10 bg-white/8 px-5 py-4">
               <span className="text-[#ffd27a]">Trụ sở ở:</span> {headquarters}
-            </p>
+            </p> */}
           </div>
         </div>
 
@@ -213,27 +140,10 @@ export default async function Page({ params }: PageProps) {
   const decodedTarget = decodeURIComponent(advertiserId);
   const primaryAdvertiser = result.creatives[0]?.advertiserName || decodedTarget;
   const advertiserDomain = result.creatives[0]?.domain;
-  const creatives = dedupeCreativesByAdvertiserName(sortCreativesByLastShownDesc(result.creatives));
+  const creatives = sortCreativesByLastShownDesc(result.creatives);
   const hasCreatives = creatives.length > 0;
 
-  function getCreativeHref(creative: (typeof result.creatives)[number]) {
-    const targetAdvertiserId = creative.advertiserId || advertiserId;
-    const href = new URL(
-      `/${encodeURIComponent(targetAdvertiserId)}/creative/${encodeURIComponent(creative.creativeId)}`,
-      "http://localhost",
-    );
-    const advertiserName = creative.advertiserName || primaryAdvertiser;
 
-    if (advertiserName) {
-      href.searchParams.set("advertiserName", advertiserName);
-    }
-
-    if (creative.domain) {
-      href.searchParams.set("domain", creative.domain);
-    }
-
-    return `${href.pathname}${href.search}`;
-  }
 
   return (
     <main className="min-h-screen overflow-hidden bg-[#050914] text-[#fff8e1]">
@@ -262,29 +172,7 @@ export default async function Page({ params }: PageProps) {
           </div>
 
           {hasCreatives ? (
-            <div className="grid grid-cols-1 gap-7 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {creatives.map((creative, index) => (
-              <Link
-                key={creative.creativeId || index}
-                href={getCreativeHref(creative)}
-                className="group/link min-w-0 rounded-[2rem] outline-none focus-visible:ring-4 focus-visible:ring-[#ffd27a]/60"
-              >
-                <AdPreview imageUrl={creative.imageUrl} />
-                <div className="px-2 pt-4">
-                  <h3 className="truncate text-lg font-black uppercase leading-6 text-white">
-                    {creative.advertiserName || primaryAdvertiser}
-                  </h3>
-                  <div className="mt-3 rounded-[1.5rem] border border-white/10 bg-white/8 p-4 text-[15px] leading-7 text-[#d7dfef] backdrop-blur">
-                    <div className="font-black text-[#7df0a7]">Đã xác minh</div>
-                    <div><span className="text-[#ffd27a]">Lần đầu:</span> {formatDate(creative.firstShownAt)}</div>
-                    <div><span className="text-[#ffd27a]">Lần cuối:</span> {formatDate(creative.lastShownAt)}</div>
-                    <div><span className="text-[#ffd27a]">Lượng truy cập:</span> {creative.regionStats ?? "-"}</div>
-                    {creative.domain && <div className="truncate"><span className="text-[#ffd27a]">Tên miền:</span> {creative.domain}</div>}
-                  </div>
-                </div>
-              </Link>
-              ))}
-            </div>
+            <CreativeGrid advertiserId={advertiserId} initialCreatives={creatives} initialNextPageToken={result.nextPageToken} primaryAdvertiser={primaryAdvertiser} />
           ) : (
             <div className="rounded-[2rem] border border-[#ffd27a]/25 bg-[#071226]/86 px-6 py-10 text-center text-[#d7dfef] shadow-[0_24px_90px_rgba(0,0,0,0.34)] backdrop-blur">
               <h3 className="text-2xl font-black text-white">Google đang giới hạn lượt tải dữ liệu</h3>
