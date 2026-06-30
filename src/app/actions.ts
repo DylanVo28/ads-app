@@ -1,8 +1,5 @@
 'use server'
 
-import { execFile } from 'node:child_process'
-import { promisify } from 'node:util'
-
 export type GoogleAdAdvertiserSuggestion = {
   type: 'advertiser'
   name: string
@@ -97,8 +94,6 @@ const GET_CREATIVE_BY_ID_URL =
 
 const GOOGLE_ADS_CACHE_TTL_MS = 10 * 60 * 1000
 const GOOGLE_ADS_RETRY_DELAYS_MS = [750, 1500, 3000]
-const execFileAsync = promisify(execFile)
-
 type CacheEntry<T> = {
   expiresAt: number
   promise: Promise<T>
@@ -137,37 +132,29 @@ function sleep(milliseconds: number) {
   return new Promise((resolve) => setTimeout(resolve, milliseconds))
 }
 
-async function postGoogleAdsRpcWithCurl(
+async function postGoogleAdsRpc(
   url: string,
   headers: HeadersInit,
   encodedFields: Record<string, string>,
 ): Promise<GoogleAdsCurlResponse> {
-  const headerEntries = new Headers(headers).entries()
-  const args = [
-    '--silent',
-    '--show-error',
-    '--location',
-    '--write-out',
-    '\n%{http_code}',
+  const body = new URLSearchParams(encodedFields)
+  const response = await fetchGoogleAdsRpc(
     url,
-  ]
+    {
+      method: 'POST',
+      headers,
+      body,
+      cache: 'no-store',
+    },
+    { retry429: true },
+  )
 
-  for (const [name, value] of headerEntries) {
-    args.push('--header', `${name}: ${value}`)
+  return {
+    ok: response.ok,
+    status: response.status,
+    statusText: response.statusText,
+    text: await response.text(),
   }
-
-  for (const [name, value] of Object.entries(encodedFields)) {
-    args.push('--data-urlencode', `${name}=${value}`)
-  }
-
-  const { stdout } = await execFileAsync('curl', args, {
-    maxBuffer: 2 * 1024 * 1024,
-  })
-  const statusSeparatorIndex = stdout.lastIndexOf('\n')
-  const text = stdout.slice(0, statusSeparatorIndex)
-  const status = Number(stdout.slice(statusSeparatorIndex + 1))
-
-  return { ok: status >= 200 && status < 300, status, statusText: '', text }
 }
 
 async function fetchGoogleAdsRpc(
@@ -233,7 +220,7 @@ export async function fetchGoogleAdSearchSuggestions(
       language: options?.language,
       referer: 'https://adstransparency.google.com/?authuser=0&region=anywhere',
     })
-    const response = await postGoogleAdsRpcWithCurl(
+    const response = await postGoogleAdsRpc(
       SEARCH_SUGGESTIONS_URL,
       headers,
       { 'f.req': requestPayloadJson },
@@ -241,7 +228,7 @@ export async function fetchGoogleAdSearchSuggestions(
 
     if (!response.ok) {
       throw new Error(
-        `Google Ads Transparency suggestions failed: ${response.status} ${response.statusText}`,
+        `Google Ads Transparency suggestions failed: ${response.status} ${response.statusText}.${getGoogleAdsRpcErrorHint(response.text)}`,
       )
     }
 
@@ -394,7 +381,7 @@ async function fetchGoogleAdCreativesUncached(
     },
   })
   
-  const response = await postGoogleAdsRpcWithCurl(
+  const response = await postGoogleAdsRpc(
     SEARCH_CREATIVES_URL,
     buildGoogleAdsTransparencyHeaders({
       language: options?.language,

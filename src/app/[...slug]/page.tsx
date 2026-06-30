@@ -172,7 +172,7 @@ export default async function Page({ params }: PageProps) {
           </div>
 
           {hasCreatives ? (
-            <CreativeGrid advertiserId={advertiserId} initialCreatives={creatives} initialNextPageToken={result.nextPageToken} primaryAdvertiser={primaryAdvertiser} />
+            <CreativeGrid advertiserId={advertiserId} initialCreatives={creatives}  primaryAdvertiser={primaryAdvertiser} />
           ) : (
             <div className="rounded-[2rem] border border-[#ffd27a]/25 bg-[#071226]/86 px-6 py-10 text-center text-[#d7dfef] shadow-[0_24px_90px_rgba(0,0,0,0.34)] backdrop-blur">
               <h3 className="text-2xl font-black text-white">Google đang giới hạn lượt tải dữ liệu</h3>
