@@ -219,28 +219,81 @@ export async function fetchGoogleAdSearchSuggestions(
     const headers = buildGoogleAdsTransparencyHeaders({
       language: options?.language,
       referer: 'https://adstransparency.google.com/?authuser=0&region=anywhere',
+      // SearchSuggestions works anonymously. Sending long-lived browser cookies from
+      // Vercel can make Google return CAPTCHA/HTML or other non-RPC responses,
+      // which Next.js surfaces to the browser only as an action digest.
+      includeCredentials: false,
     })
-    const response = await postGoogleAdsRpc(
-      SEARCH_SUGGESTIONS_URL,
-      headers,
-      { 'f.req': requestPayloadJson },
-    )
 
-    if (!response.ok) {
-      throw new Error(
-        `Google Ads Transparency suggestions failed: ${response.status} ${response.statusText}.${getGoogleAdsRpcErrorHint(response.text)}`,
+    try {
+      const response = await postGoogleAdsRpc(
+        SEARCH_SUGGESTIONS_URL,
+        headers,
+        { 'f.req': requestPayloadJson },
       )
-    }
 
-    const text = response.text
-    const data = JSON.parse(stripJsonPrefix(text)) as GoogleAdSuggestionsRpcResponse
+      if (!response.ok) {
+        throw new Error(
+          `Google Ads Transparency suggestions failed: ${response.status} ${response.statusText}.${getGoogleAdsRpcErrorHint(response.text)}`,
+        )
+      }
 
-    return {
-      suggestions: normalizeSuggestions(data),
-      nextPageToken: data['3'],
-      raw: data,
+      const text = response.text
+      const data = JSON.parse(stripJsonPrefix(text)) as GoogleAdSuggestionsRpcResponse
+
+      return {
+        suggestions: normalizeSuggestions(data),
+        nextPageToken: data['3'],
+        raw: data,
+      }
+    } catch (error) {
+      console.error('Google Ads Transparency suggestions failed', error)
+
+      return buildFallbackDomainSuggestionsResult(query)
     }
   })
+}
+
+function buildFallbackDomainSuggestionsResult(
+  query: string,
+): GoogleAdSearchSuggestionsResult {
+  const normalizedDomain = normalizeFallbackDomain(query)
+
+  return {
+    suggestions: normalizedDomain
+      ? [{ type: 'domain' as const, domain: normalizedDomain }]
+      : [],
+    raw: {
+      fallback: true,
+      query,
+      domain: normalizedDomain,
+    },
+  }
+}
+
+function normalizeFallbackDomain(query: string) {
+  const normalizedQuery = query
+    .trim()
+    .toLowerCase()
+    .replace(/^https?:\/\//, '')
+    .replace(/^www\./, '')
+    .split('/')[0]
+    .replace(/[^a-z0-9.-]/g, '')
+    .replace(/^\.+|\.+$/g, '')
+
+  if (!normalizedQuery || normalizedQuery.length < 2) {
+    return undefined
+  }
+
+  if (normalizedQuery.includes('.')) {
+    return isLikelyDomain(normalizedQuery) ? normalizedQuery : undefined
+  }
+
+  return `${normalizedQuery}.com`
+}
+
+function isLikelyDomain(value: string) {
+  return /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/.test(value)
 }
 
 function normalizeSuggestions(
@@ -388,6 +441,7 @@ async function fetchGoogleAdCreativesUncached(
       referer: isDomainRequest
         ? `https://adstransparency.google.com/?authuser=0&region=anywhere&domain=${encodeURIComponent(id)}`
         : `https://adstransparency.google.com/advertiser/${id}?authuser=0`,
+      includeCredentials: true,
     }),
     { 'f.req': requestPayloadJson },
   )
@@ -473,6 +527,7 @@ async function fetchGoogleAdCreativeByIdUncached(
     headers: buildGoogleAdsTransparencyHeaders({
       language: options?.language,
       referer: `https://adstransparency.google.com/advertiser/${normalizedAdvertiserId}/creative/${normalizedCreativeId}?authuser=0`,
+      includeCredentials: true,
     }),
     body,
   })
@@ -500,6 +555,7 @@ function isDomain(value: string) {
 function buildGoogleAdsTransparencyHeaders(options?: {
   language?: string
   referer?: string
+  includeCredentials?: boolean
 }): HeadersInit {
   return {
     accept: '*/*',
@@ -519,13 +575,13 @@ function buildGoogleAdsTransparencyHeaders(options?: {
     'user-agent':
       'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36',
     'x-same-domain': '1',
-    ...(process.env.GOOGLE_ADS_TRANSPARENCY_XSRF_TOKEN
+    ...(options?.includeCredentials && process.env.GOOGLE_ADS_TRANSPARENCY_XSRF_TOKEN
       ? {
           'x-framework-xsrf-token':
             process.env.GOOGLE_ADS_TRANSPARENCY_XSRF_TOKEN,
         }
       : {}),
-    ...(process.env.GOOGLE_ADS_TRANSPARENCY_COOKIE
+    ...(options?.includeCredentials && process.env.GOOGLE_ADS_TRANSPARENCY_COOKIE
       ? { cookie: process.env.GOOGLE_ADS_TRANSPARENCY_COOKIE }
       : {}),
   }
